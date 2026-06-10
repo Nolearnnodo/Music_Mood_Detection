@@ -1,0 +1,28 @@
+{
+  "name": "music-mood-cli",
+  "version-string": "1.0.0",
+  "builtin-baseline": "84bab45d415d22042bd0b9081aea57f362da3f35",
+  "dependencies": [
+    "eigen3",
+    "fftw3",
+    "openssl",
+    "cpp-httplib",
+    "nlohmann-json",
+    "sqlite3",
+    {
+      "name": "ncnn",
+      "features": [
+        "vulkan"
+      ]
+    },
+    {
+      "name": "ffmpeg",
+      "features": [
+        "avcodec",
+        "avfilter",
+        "avformat",
+        "swresample"
+      ]
+    }
+  ]
+}

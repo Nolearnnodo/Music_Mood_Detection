@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  background-color: #f8fafc; /* Slate 50 */
+  color: #0f172a; /* Slate 900 */
+  color-scheme: light;
+}
+
+.dark {
+  background-color: #0f172a; /* Slate 900 */
+  color: #e2e8f0; /* Slate 200 */
+  color-scheme: dark;
+}
