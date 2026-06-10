@@ -11,7 +11,20 @@ import {
 import 'react-h5-audio-player/lib/styles.css';
 import '../player-theme.css';
 
-function Player({ selectedTrack, onTrackChange, onPlaylistChange, onExportPlaylist, onTimeUpdate, radius, setRadius, appSettings }) {
+function Player({
+  selectedTrack,
+  onTrackChange,
+  onPlaylistChange,
+  onExportPlaylist,
+  onTimeUpdate,
+  radius,
+  setRadius,
+  appSettings,
+  externalPlaylist,
+  externalPlaylistVersion = 0,
+  externalStartIndex = 0,
+  playlistLabel = '播放列表'
+}) {
   const playerRef = useRef(null);
   const activeTrackRef = useRef(null);
 
@@ -52,6 +65,18 @@ function Player({ selectedTrack, onTrackChange, onPlaylistChange, onExportPlayli
       handlePreviewPlaylist(selectedTrack, radius);
     }
   }, [selectedTrack]);
+
+  useEffect(() => {
+    if (!externalPlaylistVersion || !externalPlaylist?.length) return;
+
+    const startIndex = Math.min(Math.max(externalStartIndex, 0), externalPlaylist.length - 1);
+    setPlaylist(externalPlaylist);
+    setCurrentIndex(startIndex);
+    setFullTrackInfo(null);
+    setErrorMsg(null);
+    setShowPlaylist(true);
+    onPlaylistChange?.(externalPlaylist);
+  }, [externalPlaylistVersion, externalPlaylist, externalStartIndex]);
 
   // 防抖监听 radius 变化，自动更新列表和时长
   useEffect(() => {
@@ -310,6 +335,10 @@ function Player({ selectedTrack, onTrackChange, onPlaylistChange, onExportPlayli
       {showPlaylist && playlist.length > 0 && (
         <div
           className="bg-slate-100 dark:bg-slate-900/50 rounded-lg p-1 border border-mood-border animate-in slide-in-from-top-2 duration-200">
+          <div className="px-2 py-1 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+            <span>{playlistLabel}</span>
+            <span>{playlist.length} 首</span>
+          </div>
           <div className="max-h-60 overflow-y-auto custom-scrollbar pr-1">
             {playlist.map((track, idx) => (
               <div

@@ -1,17 +1,28 @@
-# 🎵 Music Mood
+# 🎵 情绪音乐电台 / Music Mood Radio
 
 [![Nightly Build](https://github.com/Sg4Dylan/MusicMood/actions/workflows/release.yml/badge.svg)](https://github.com/Sg4Dylan/MusicMood/releases)
 ![License](https://img.shields.io/badge/license-AGPLv3-blue)
 ![C++](https://img.shields.io/badge/C++-17-00599C?logo=c%2B%2B)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)
 
-**Music Mood** 是一个基于深度学习的本地音乐情绪分析与播放工具。
+**情绪音乐电台** 是一个面向“人机交互导论”课程项目的本地情绪音乐推荐 Web 应用。它在原 **Music Mood** 本地音乐情绪分析工具的基础上，新增了浏览器端面部情绪识别能力：系统可以扫描你的本地音乐库，分析每首歌曲的 **Valence（愉悦度）** 和 **Arousal（能量值）**，再根据摄像头识别到的用户当前情绪，从用户自己的音乐库中生成推荐歌单。
 
-它能够扫描你的本地音乐库，利用 AI 模型分析每一首歌曲的 **Valence (愉悦度)** 和 **Arousal (能量值)**，并将它们映射到一个二维情绪象限图中。你可以通过点击图表上的点来探索音乐，或者圈选特定情绪区域生成智能播放列表。
+它的核心交互流程是：
+
+1. 用户在 Web 端选择本地音乐库文件夹。
+2. 后端调用音乐分析模型自动分析歌曲情绪特征并保存到 SQLite。
+3. 用户开启摄像头，前端在浏览器本地识别当前面部表情。
+4. 系统将面部情绪映射到音乐情绪坐标。
+5. 系统自动从本地音乐库中推荐适合当前情绪的歌曲，并支持直接播放。
 
 ## ✨ 主要特性 (Features)
 
 *   **🧠 本地 AI 推理**: 使用 `ncnn` 框架在本地 CPU/GPU 上运行深度学习模型，无需上传文件，保护隐私。
+*   **🙂 面部情绪识别**: 使用 `face-api.js` 在浏览器本地识别用户表情，支持开心、平静、伤心、生气、紧张、厌恶、惊讶等情绪。
+*   **📻 情绪音乐电台**:
+    *   将面部表情映射到 Valence/Arousal 二维音乐情绪空间。
+    *   支持“匹配心情”和“安抚心情”两种推荐策略。
+    *   一键根据当前面部情绪生成本地音乐推荐歌单。
 *   **📊 情绪象限可视化**:
     *   基于 Russell 情绪环状模型 (Circumplex Model) 展示音乐情绪分布。
     *   **实时轨迹追踪**: 播放时在图表上实时显示歌曲当前的情绪落点。
@@ -25,6 +36,7 @@
 *   **🌓 深色模式**: 基于 TailwindCSS 的自适应深色/浅色主题。
 *   **💾 数据持久化**: 使用 SQLite 存储分析结果，一次分析，永久使用。
 *   **📑 播放列表导出**: 支持将生成的歌单导出为 `.m3u`、`.pls` 或 `.txt` 文件。
+*   **🔒 本地隐私保护**: 音乐文件不上传，摄像头画面不上传，音乐分析和面部识别均在本地完成。
 
 ## 🚀 快速开始 (Quick Start)
 
@@ -39,8 +51,11 @@
 ### 使用指南
 1.  在左侧控制面板点击输入框，选择你的音乐文件夹并添加。
 2.  等待后台扫描与 AI 分析完成（Web 界面会通过 SSE 实时显示进度）。
-3.  点击右侧图表中的任意散点，开始播放。
-4.  调整左侧的 **Similarity Radius** 滑块，生成特定情绪范围的歌单。
+3.  点击“面部情绪识别”中的“开启”，允许浏览器访问摄像头。
+4.  在“情绪音乐电台”中选择“匹配心情”或“安抚心情”。
+5.  点击“根据当前情绪推荐”，系统会从已分析音乐库中生成推荐歌单。
+6.  点击推荐歌单中的歌曲或“播放”，即可开始播放。
+7.  你也可以点击右侧情绪图中的任意散点，手动探索和播放歌曲。
 
 ## 🛠️ 从源码构建 (Build from Source)
 
@@ -60,8 +75,8 @@ cd MusicMood
 ### 2. 编译前端 (Web)
 ```bash
 cd frontend/web
-bun install
-bun run build
+npm install
+npm run build
 # 构建产物将生成在 frontend/web/dist 目录
 cd ../..
 ```
@@ -92,15 +107,67 @@ cmake --build build --config Release
 
 # 终端 2：启动前端开发服务器
 cd frontend/web
-bun install
-bun run dev
+npm install
+npm run dev
 ```
+
+浏览器访问 Vite 输出的地址，通常是：
+
+```text
+http://localhost:5173
+```
+
+如果要使用仓库内的示例音乐库，可以在页面中选择：
+
+```text
+F:\Music_Mood_Detection\My_music
+```
+
+摄像头功能需要使用 `localhost`、`127.0.0.1` 或 HTTPS 访问。请不要使用局域网 IP 地址访问前端，否则浏览器可能会禁止摄像头权限。
 
 如果需要使用其它端口：
 ```bash
 ./build/Release/MusicMoodCLI.exe --api-only --port 8090 --model-dir ./models
 ```
 同时把 `frontend/web/vite.config.js` 中的代理目标改成对应端口。
+
+### 发布/部署模式：由 C++ 后端统一托管 Web
+
+1. 构建前端：
+
+```bash
+cd frontend/web
+npm install
+npm run build
+cd ../..
+```
+
+2. 将 `frontend/web/dist` 复制为后端静态目录，例如复制到可执行文件同级的 `web/`。
+
+3. 确保后端可执行文件同级存在：
+
+```text
+MusicMoodCLI.exe
+models/
+web/
+```
+
+其中：
+
+* `models/` 是音乐分析模型目录，包含 ncnn `.param` 和 `.bin` 文件。
+* `web/` 是 `frontend/web/dist` 的构建产物，里面也包含面部识别所需的 `face-api.min.js` 和 `face-models/`。
+
+4. 启动后端：
+
+```bash
+./MusicMoodCLI.exe --model-dir ./models --web-root ./web
+```
+
+浏览器访问：
+
+```text
+http://localhost:8080
+```
 
 ## 🧩 技术栈 (Tech Stack)
 
@@ -112,15 +179,17 @@ bun run dev
 *   **Utils**: `nlohmann/json`, `Eigen3`.
 
 ### Frontend (React)
-*   **Framework**: React 18 + Vite.
+*   **Framework**: React + Vite.
 *   **UI/Styling**: TailwindCSS, Lucide React (Icons).
 *   **Visualization**: Chart.js + chartjs-plugin-annotation + chartjs-plugin-zoom.
 *   **Audio**: react-h5-audio-player.
+*   **Face Emotion**: face-api.js.
 
 ## 🤖 模型说明 (Models)
 本项目使用了预训练的音乐情绪分析模型：
 *   **MusicNN**: 用于提取音频的高维特征。
 *   **DEAM Regressor**: 将特征映射到 Valence/Arousal 值。
+*   **face-api.js expression model**: 用于浏览器端面部表情识别。
 
 ## ⚖️ 开源协议 (License)
 

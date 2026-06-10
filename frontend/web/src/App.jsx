@@ -7,6 +7,8 @@ import Player from './components/Player';
 import MoodChart from './components/MoodChart';
 import ControlPanel from './components/ControlPanel';
 import SettingsModal from './components/SettingsModal';
+import EmotionCamera from './components/EmotionCamera';
+import EmotionRadioPanel from './components/EmotionRadioPanel';
 
 function handleDownloadPlaylist(url) {
   window.open(url, '_blank');
@@ -30,6 +32,12 @@ function App() {
 
   const [currentTime, setCurrentTime] = useState(0);
   const [playlistItems, setPlaylistItems] = useState([]);
+  const [faceEmotion, setFaceEmotion] = useState(null);
+  const [emotionPlaylist, setEmotionPlaylist] = useState([]);
+  const [emotionPlaylistVersion, setEmotionPlaylistVersion] = useState(0);
+  const [emotionStartIndex, setEmotionStartIndex] = useState(0);
+  const [isEmotionLoading, setIsEmotionLoading] = useState(false);
+  const [emotionPlaylistLabel, setEmotionPlaylistLabel] = useState('情绪推荐歌单');
 
   const isScanningRef = useRef(false);
   const [isScanningUI, setIsScanningUI] = useState(false);
@@ -207,6 +215,50 @@ function App() {
     setPlaylistItems(list);
   };
 
+  const handleEmotionGenerate = async ({ faceEmotion: stableEmotion, moodTarget, strategy }) => {
+    if (!stableEmotion || !moodTarget) return;
+
+    setIsEmotionLoading(true);
+    try {
+      const params = {
+        v: moodTarget.v,
+        a: moodTarget.a,
+        r: moodTarget.radius || playlistRadius,
+        format: 'json',
+        limit: appSettings.limit
+      };
+
+      if (appSettings.durationLimit > 0)
+        params.duration_limit = appSettings.durationLimit;
+
+      const res = await axios.get('/api/playlist/generate', { params });
+      const list = Array.isArray(res.data) ? res.data : [];
+
+      setEmotionPlaylist(list);
+      setPlaylistItems(list);
+      setPlaylistRadius(moodTarget.radius || playlistRadius);
+      setEmotionPlaylistLabel(`${moodTarget.title || '情绪推荐'} · ${strategy === 'comfort' ? '安抚' : '匹配'}`);
+
+      if (list.length > 0) {
+        setEmotionStartIndex(0);
+        setEmotionPlaylistVersion(v => v + 1);
+      }
+    } catch (e) {
+      console.error('Emotion playlist failed', e);
+      alert('情绪推荐失败，请确认音乐库已经完成分析');
+    } finally {
+      setIsEmotionLoading(false);
+    }
+  };
+
+  const handleEmotionPlay = (index = 0) => {
+    if (!emotionPlaylist.length) return;
+    const startIndex = typeof index === 'number' ? index : 0;
+    setEmotionStartIndex(startIndex);
+    setEmotionPlaylistVersion(v => v + 1);
+    setPlaylistItems(emotionPlaylist);
+  };
+
   return (
     <div className="h-screen bg-mood-bg text-mood-text p-4 md:p-6 font-sans flex flex-col md:flex-row gap-6 overflow-hidden transition-colors duration-300">
 
@@ -232,6 +284,17 @@ function App() {
           isScanning={isScanningUI} // 传递 UI 状态
         />
 
+        <EmotionCamera onEmotion={setFaceEmotion}/>
+
+        <EmotionRadioPanel
+          faceEmotion={faceEmotion}
+          onGenerate={handleEmotionGenerate}
+          onPlay={handleEmotionPlay}
+          playlist={emotionPlaylist}
+          loading={isEmotionLoading}
+          tracksReady={tracks.length > 0}
+        />
+
         <Player
           selectedTrack={selectedTrack}
           onTrackChange={handlePlayerTrackChange}
@@ -241,6 +304,10 @@ function App() {
           radius={playlistRadius}
           setRadius={setPlaylistRadius}
           appSettings={appSettings}
+          externalPlaylist={emotionPlaylist}
+          externalPlaylistVersion={emotionPlaylistVersion}
+          externalStartIndex={emotionStartIndex}
+          playlistLabel={emotionPlaylistLabel}
         />
 
         <div className="mt-auto pt-4 opacity-60 text-[10px] text-center shrink-0">

@@ -1,0 +1,26 @@
+# Build outputs
+build/
+**/build/
+**/dist/
+cmake-build-*/
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Runtime database
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+
+# Local music library, do not push personal/copyrighted songs
+My_music/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
