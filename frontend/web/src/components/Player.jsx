@@ -23,7 +23,9 @@ function Player({
   externalPlaylist,
   externalPlaylistVersion = 0,
   externalStartIndex = 0,
-  playlistLabel = '播放列表'
+  playlistLabel = '播放列表',
+  autoRefresh = false,
+  onPlaylistLow
 }) {
   const playerRef = useRef(null);
   const activeTrackRef = useRef(null);
@@ -208,8 +210,11 @@ function Player({
   };
 
   const handleEnded = () => {
-    if (currentIndex < playlist.length - 1)
+    if (currentIndex < playlist.length - 1) {
       setCurrentIndex(prev => prev + 1);
+    } else if (autoRefresh && typeof onPlaylistLow === 'function') {
+      onPlaylistLow();
+    }
   };
 
   const handleError = () => {

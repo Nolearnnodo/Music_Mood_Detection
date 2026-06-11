@@ -1,4 +1,4 @@
-import { Brain, ListMusic, Loader2, Play, Radio, Sparkles } from 'lucide-react';
+import { Brain, ListMusic, Loader2, Play, Radio, RefreshCcw, Sparkles } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import {
@@ -11,6 +11,8 @@ import { useStableFaceEmotion } from '../hooks/useStableFaceEmotion';
 function EmotionRadioPanel({
   faceEmotion,
   manualEmotion,
+  autoRefresh,
+  onAutoRefreshChange,
   onGenerate,
   onPlay,
   playlist,
@@ -72,6 +74,23 @@ function EmotionRadioPanel({
           安抚心情
         </button>
       </div>
+
+      <button
+        onClick={() => onAutoRefreshChange?.(!autoRefresh)}
+        className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs border transition-colors ${
+          autoRefresh
+            ? 'bg-indigo-600 text-white border-indigo-600'
+            : 'bg-slate-100 dark:bg-slate-800 border-mood-border text-mood-text hover:bg-slate-200 dark:hover:bg-slate-700'
+        }`}
+      >
+        <span className="flex items-center gap-1.5">
+          <RefreshCcw size={13} className={autoRefresh ? 'animate-[spin_3s_linear_infinite]' : ''} />
+          持续电台
+        </span>
+        <span className="text-[10px] opacity-80">
+          {autoRefresh ? 'ON' : 'OFF'}
+        </span>
+      </button>
 
       <div className="rounded-lg bg-slate-100 dark:bg-slate-900/50 border border-mood-border p-3 text-xs flex flex-col gap-2">
         <div className="flex items-center justify-between">

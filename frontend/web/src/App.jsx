@@ -35,6 +35,8 @@ function App() {
   const [playlistItems, setPlaylistItems] = useState([]);
   const [faceEmotion, setFaceEmotion] = useState(null);
   const [manualEmotion, setManualEmotion] = useState(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const lastEmotionParamsRef = useRef(null);
   const [emotionPlaylist, setEmotionPlaylist] = useState([]);
   const [emotionPlaylistVersion, setEmotionPlaylistVersion] = useState(0);
   const [emotionStartIndex, setEmotionStartIndex] = useState(0);
@@ -220,6 +222,8 @@ function App() {
   const handleEmotionGenerate = async ({ faceEmotion: stableEmotion, moodTarget, strategy }) => {
     if (!stableEmotion || !moodTarget) return;
 
+    lastEmotionParamsRef.current = { faceEmotion: stableEmotion, moodTarget, strategy };
+
     setIsEmotionLoading(true);
     try {
       const params = {
@@ -261,6 +265,16 @@ function App() {
     setPlaylistItems(emotionPlaylist);
   };
 
+  const handlePlaylistLow = () => {
+    if (lastEmotionParamsRef.current) {
+      handleEmotionGenerate(lastEmotionParamsRef.current);
+    }
+  };
+
+  const handleAutoRefreshChange = (value) => {
+    setAutoRefresh(value);
+  };
+
   return (
     <div className="h-screen bg-mood-bg text-mood-text p-4 md:p-6 font-sans flex flex-col md:flex-row gap-6 overflow-hidden transition-colors duration-300">
 
@@ -293,6 +307,8 @@ function App() {
         <EmotionRadioPanel
           faceEmotion={faceEmotion}
           manualEmotion={manualEmotion}
+          autoRefresh={autoRefresh}
+          onAutoRefreshChange={handleAutoRefreshChange}
           onGenerate={handleEmotionGenerate}
           onPlay={handleEmotionPlay}
           playlist={emotionPlaylist}
@@ -313,6 +329,8 @@ function App() {
           externalPlaylistVersion={emotionPlaylistVersion}
           externalStartIndex={emotionStartIndex}
           playlistLabel={emotionPlaylistLabel}
+          autoRefresh={autoRefresh}
+          onPlaylistLow={handlePlaylistLow}
         />
 
         <div className="mt-auto pt-4 opacity-60 text-[10px] text-center shrink-0">
