@@ -1,7 +1,8 @@
-import { Camera, CameraOff, Loader2, ShieldCheck, Video } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Camera, CameraOff, Loader2, MoveLeft, MoveUp, ShieldCheck, Video } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { getFaceEmotionEmoji, getFaceEmotionLabel } from '../emotionMapping';
+import useHeadGesture from '../hooks/useHeadGesture';
 
 const FACE_API_SRC = '/face-api.min.js';
 const MODEL_URL = '/face-models';
@@ -38,16 +39,29 @@ function getTopExpression(expressions) {
   );
 }
 
-function EmotionCamera({ onEmotion }) {
+function EmotionCamera({ onEmotion, onGesture }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const intervalRef = useRef(null);
+  const gestureCallbackRef = useRef(onGesture);
+  gestureCallbackRef.current = onGesture;
   const [isRunning, setIsRunning] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState('摄像头未开启');
   const [error, setError] = useState('');
   const [currentEmotion, setCurrentEmotion] = useState(null);
+  const [lastGesture, setLastGesture] = useState(null);
+  const gestureTimeoutRef = useRef(null);
+
+  const handleGesture = useCallback((type) => {
+    gestureCallbackRef.current?.(type);
+    setLastGesture(type);
+    if (gestureTimeoutRef.current) clearTimeout(gestureTimeoutRef.current);
+    gestureTimeoutRef.current = setTimeout(() => setLastGesture(null), 1800);
+  }, []);
+
+  const { feed } = useHeadGesture({ onGesture: handleGesture });
 
   const stopCamera = () => {
     if (intervalRef.current) {
@@ -91,7 +105,8 @@ function EmotionCamera({ onEmotion }) {
       const faceapi = await loadFaceApi();
       await Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+        faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
+        faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL)
       ]);
 
       setStatus('等待摄像头权限');
@@ -125,6 +140,7 @@ function EmotionCamera({ onEmotion }) {
 
         const detections = await faceapi
           .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+          .withFaceLandmarks()
           .withFaceExpressions();
 
         const ctx = canvas.getContext('2d');
@@ -132,12 +148,15 @@ function EmotionCamera({ onEmotion }) {
 
         if (!detections.length) {
           setStatus('未检测到人脸');
+          feed(null);
           return;
         }
 
         const resized = faceapi.resizeResults(detections, displaySize);
         faceapi.draw.drawDetections(canvas, resized);
-        faceapi.draw.drawFaceExpressions(canvas, resized);
+        faceapi.draw.drawFaceLandmarks(canvas, resized);
+
+        feed(detections[0].landmarks.positions);
 
         const [label, confidence] = getTopExpression(detections[0].expressions);
         const nextEmotion = {
@@ -219,6 +238,15 @@ function EmotionCamera({ onEmotion }) {
         </div>
         <ShieldCheck size={16} className="text-emerald-500 shrink-0"/>
       </div>
+
+      {lastGesture && (
+        <div className="flex items-center gap-2 text-[11px] text-violet-600 dark:text-violet-400 bg-violet-500/10 border border-violet-500/20 rounded-lg p-2">
+          {lastGesture === 'nod' ? <MoveUp size={14} className="animate-bounce" /> : <MoveLeft size={14} className="animate-[bounce_0.6s_ease-in-out_2]" />}
+          <span>检测到</span>
+          <span className="font-semibold">{lastGesture === 'nod' ? '点头' : '摇头'}</span>
+          <span className="opacity-70">{lastGesture === 'nod' ? '(确认)' : '(切歌)'}</span>
+        </div>
+      )}
 
       {error && (
         <div className="text-[11px] bg-red-500/10 border border-red-500/20 text-red-500 rounded-lg p-2">

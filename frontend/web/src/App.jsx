@@ -36,6 +36,7 @@ function App() {
   const [faceEmotion, setFaceEmotion] = useState(null);
   const [manualEmotion, setManualEmotion] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [skipSongTrigger, setSkipSongTrigger] = useState(0);
   const lastEmotionParamsRef = useRef(null);
   const [emotionPlaylist, setEmotionPlaylist] = useState([]);
   const [emotionPlaylistVersion, setEmotionPlaylistVersion] = useState(0);
@@ -275,6 +276,12 @@ function App() {
     setAutoRefresh(value);
   };
 
+  const handleHeadGesture = (type) => {
+    if (type === 'shake') {
+      setSkipSongTrigger(v => v + 1);
+    }
+  };
+
   return (
     <div className="h-screen bg-mood-bg text-mood-text p-4 md:p-6 font-sans flex flex-col md:flex-row gap-6 overflow-hidden transition-colors duration-300">
 
@@ -300,7 +307,7 @@ function App() {
           isScanning={isScanningUI} // 传递 UI 状态
         />
 
-        <EmotionCamera onEmotion={setFaceEmotion}/>
+        <EmotionCamera onEmotion={setFaceEmotion} onGesture={handleHeadGesture}/>
 
         <ManualEmotionSelector onSelect={setManualEmotion}/>
 
@@ -331,6 +338,7 @@ function App() {
           playlistLabel={emotionPlaylistLabel}
           autoRefresh={autoRefresh}
           onPlaylistLow={handlePlaylistLow}
+          skipSongTrigger={skipSongTrigger}
         />
 
         <div className="mt-auto pt-4 opacity-60 text-[10px] text-center shrink-0">
