@@ -9,6 +9,7 @@ import ControlPanel from './components/ControlPanel';
 import SettingsModal from './components/SettingsModal';
 import EmotionCamera from './components/EmotionCamera';
 import EmotionRadioPanel from './components/EmotionRadioPanel';
+import ManualEmotionSelector from './components/ManualEmotionSelector';
 
 function handleDownloadPlaylist(url) {
   window.open(url, '_blank');
@@ -33,6 +34,7 @@ function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [playlistItems, setPlaylistItems] = useState([]);
   const [faceEmotion, setFaceEmotion] = useState(null);
+  const [manualEmotion, setManualEmotion] = useState(null);
   const [emotionPlaylist, setEmotionPlaylist] = useState([]);
   const [emotionPlaylistVersion, setEmotionPlaylistVersion] = useState(0);
   const [emotionStartIndex, setEmotionStartIndex] = useState(0);
@@ -286,8 +288,11 @@ function App() {
 
         <EmotionCamera onEmotion={setFaceEmotion}/>
 
+        <ManualEmotionSelector onSelect={setManualEmotion}/>
+
         <EmotionRadioPanel
           faceEmotion={faceEmotion}
+          manualEmotion={manualEmotion}
           onGenerate={handleEmotionGenerate}
           onPlay={handleEmotionPlay}
           playlist={emotionPlaylist}

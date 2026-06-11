@@ -10,6 +10,7 @@ import { useStableFaceEmotion } from '../hooks/useStableFaceEmotion';
 
 function EmotionRadioPanel({
   faceEmotion,
+  manualEmotion,
   onGenerate,
   onPlay,
   playlist,
@@ -17,7 +18,9 @@ function EmotionRadioPanel({
   tracksReady
 }) {
   const [strategy, setStrategy] = useState('match');
-  const { stableEmotion, candidate } = useStableFaceEmotion(faceEmotion);
+  const { stableEmotion: camStable, candidate } = useStableFaceEmotion(faceEmotion);
+
+  const stableEmotion = manualEmotion || camStable;
 
   const moodTarget = useMemo(() => {
     if (!stableEmotion?.label) return null;
@@ -85,7 +88,9 @@ function EmotionRadioPanel({
           </span>
         </div>
         <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-          {moodTarget?.description || '开启摄像头并保持表情稳定后，系统会给出推荐目标。'}
+          {moodTarget?.description || (manualEmotion
+            ? '已通过手动选择确定当前情绪。'
+            : '开启摄像头并保持表情稳定后，系统会给出推荐目标。')}
         </div>
       </div>
 
