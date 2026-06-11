@@ -106,7 +106,7 @@ function EmotionCamera({ onEmotion, onGesture }) {
       await Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
         faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68TinyNet.loadFromUri(MODEL_URL)
+        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL)
       ]);
 
       setStatus('等待摄像头权限');
@@ -138,37 +138,50 @@ function EmotionCamera({ onEmotion, onGesture }) {
       intervalRef.current = window.setInterval(async () => {
         if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) return;
 
-        const detections = await faceapi
-          .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions())
-          .withFaceLandmarks()
-          .withFaceExpressions();
+        try {
+          const detections = await faceapi
+            .detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+            .withFaceExpressions();
 
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        if (!detections.length) {
-          setStatus('未检测到人脸');
-          feed(null);
-          return;
+          if (!detections.length) {
+            setStatus('未检测到人脸');
+            feed(null);
+            return;
+          }
+
+          const resized = faceapi.resizeResults(detections, displaySize);
+          faceapi.draw.drawDetections(canvas, resized);
+          faceapi.draw.drawFaceExpressions(canvas, resized);
+
+          try {
+            const withLandmarks = await faceapi
+              .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+              .withFaceLandmarks();
+
+            if (withLandmarks?.landmarks?.positions) {
+              feed(withLandmarks.landmarks.positions);
+            }
+          } catch {
+            feed(null);
+          }
+
+          const [label, confidence] = getTopExpression(detections[0].expressions);
+          const nextEmotion = {
+            label,
+            confidence,
+            scores: detections[0].expressions,
+            timestamp: Date.now()
+          };
+
+          setCurrentEmotion(nextEmotion);
+          setStatus(`${getFaceEmotionLabel(label)} ${(confidence * 100).toFixed(0)}%`);
+          onEmotion?.(nextEmotion);
+        } catch {
+          setStatus('检测异常，重试中');
         }
-
-        const resized = faceapi.resizeResults(detections, displaySize);
-        faceapi.draw.drawDetections(canvas, resized);
-        faceapi.draw.drawFaceLandmarks(canvas, resized);
-
-        feed(detections[0].landmarks.positions);
-
-        const [label, confidence] = getTopExpression(detections[0].expressions);
-        const nextEmotion = {
-          label,
-          confidence,
-          scores: detections[0].expressions,
-          timestamp: Date.now()
-        };
-
-        setCurrentEmotion(nextEmotion);
-        setStatus(`${getFaceEmotionLabel(label)} ${(confidence * 100).toFixed(0)}%`);
-        onEmotion?.(nextEmotion);
       }, 180);
     } catch (err) {
       const message = err?.message || String(err);
