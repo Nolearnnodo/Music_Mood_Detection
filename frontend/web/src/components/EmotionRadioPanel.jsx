@@ -1,5 +1,5 @@
 import { Brain, ListMusic, Loader2, Play, Radio, RefreshCcw, Sparkles } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   getFaceEmotionEmoji,
@@ -15,6 +15,7 @@ function EmotionRadioPanel({
   onAutoRefreshChange,
   onGenerate,
   onPlay,
+  onStableChange,
   playlist,
   loading,
   tracksReady
@@ -23,6 +24,25 @@ function EmotionRadioPanel({
   const { stableEmotion: camStable, candidate } = useStableFaceEmotion(faceEmotion);
 
   const stableEmotion = manualEmotion || camStable;
+
+  const lastStableLabelRef = useRef(null);
+
+  useEffect(() => {
+    if (!camStable?.label) return;
+    if (manualEmotion) return;
+    if (camStable.label === lastStableLabelRef.current) return;
+    lastStableLabelRef.current = camStable.label;
+
+    const target = getMoodTarget(camStable.label, strategy);
+    onStableChange?.({
+      emotion: camStable.label,
+      confidence: camStable.confidence,
+      source: 'camera',
+      valence: target.v,
+      arousal: target.a,
+      strategy
+    });
+  }, [camStable, manualEmotion, strategy, onStableChange]);
 
   const moodTarget = useMemo(() => {
     if (!stableEmotion?.label) return null;

@@ -10,6 +10,8 @@ import SettingsModal from './components/SettingsModal';
 import EmotionCamera from './components/EmotionCamera';
 import EmotionRadioPanel from './components/EmotionRadioPanel';
 import ManualEmotionSelector from './components/ManualEmotionSelector';
+import EmotionTimeline from './components/EmotionTimeline';
+import { useEmotionLog } from './hooks/useEmotionLog';
 
 function handleDownloadPlaylist(url) {
   window.open(url, '_blank');
@@ -43,6 +45,8 @@ function App() {
   const [emotionStartIndex, setEmotionStartIndex] = useState(0);
   const [isEmotionLoading, setIsEmotionLoading] = useState(false);
   const [emotionPlaylistLabel, setEmotionPlaylistLabel] = useState('情绪推荐歌单');
+
+  const { logs: emotionLogs, addEntry: addEmotionLog, clearLogs: clearEmotionLogs, stats: emotionStats } = useEmotionLog();
 
   const isScanningRef = useRef(false);
   const [isScanningUI, setIsScanningUI] = useState(false);
@@ -225,6 +229,16 @@ function App() {
 
     lastEmotionParamsRef.current = { faceEmotion: stableEmotion, moodTarget, strategy };
 
+    const effectiveEmo = manualEmotion || (faceEmotion?.source === 'manual' ? faceEmotion : faceEmotion);
+    addEmotionLog({
+      emotion: stableEmotion.label,
+      confidence: stableEmotion.confidence,
+      source: stableEmotion.source || (manualEmotion ? 'manual' : 'camera'),
+      valence: moodTarget.v,
+      arousal: moodTarget.a,
+      strategy
+    });
+
     setIsEmotionLoading(true);
     try {
       const params = {
@@ -276,6 +290,10 @@ function App() {
     setAutoRefresh(value);
   };
 
+  const handleStableChange = (entry) => {
+    addEmotionLog(entry);
+  };
+
   const handleHeadGesture = (type) => {
     if (type === 'shake') {
       setSkipSongTrigger(v => v + 1);
@@ -316,6 +334,7 @@ function App() {
           manualEmotion={manualEmotion}
           autoRefresh={autoRefresh}
           onAutoRefreshChange={handleAutoRefreshChange}
+          onStableChange={handleStableChange}
           onGenerate={handleEmotionGenerate}
           onPlay={handleEmotionPlay}
           playlist={emotionPlaylist}
@@ -339,6 +358,12 @@ function App() {
           autoRefresh={autoRefresh}
           onPlaylistLow={handlePlaylistLow}
           skipSongTrigger={skipSongTrigger}
+        />
+
+        <EmotionTimeline
+          logs={emotionLogs}
+          stats={emotionStats}
+          onClear={clearEmotionLogs}
         />
 
         <div className="mt-auto pt-4 opacity-60 text-[10px] text-center shrink-0">
