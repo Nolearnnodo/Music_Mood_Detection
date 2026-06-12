@@ -39,12 +39,39 @@ export function AppStateProvider({ children }) {
 
   const [appSettings, setAppSettings] = useState(() => {
     const saved = localStorage.getItem('mood_settings');
-    return saved ? JSON.parse(saved) : { limit: 50, durationLimit: 0, defaultRadius: 0.6 };
+    const defaults = { limit: 50, durationLimit: 0, defaultRadius: 0.6, moodThemeEnabled: true };
+    return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
   });
   const [playlistRadius, setPlaylistRadius] = useState(appSettings.defaultRadius);
 
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'system');
   const [isDark, setIsDark] = useState(true);
+
+  // 面部情绪 → 主题键映射(neutral 不开主题,保持默认蓝)
+  const FACE_TO_THEME = {
+    happy: 'happy',
+    neutral: 'calm',
+    sad: 'sad',
+    angry: 'angry',
+    fearful: 'anxious',
+    disgusted: 'anxious',
+    surprised: 'energetic'
+  };
+
+  // 优先级:手动选择 > 摄像头稳定情绪 > 默认
+  const currentMoodTheme = (() => {
+    const label = manualEmotion?.label || faceEmotion?.label;
+    return label ? (FACE_TO_THEME[label] || null) : null;
+  })();
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (appSettings.moodThemeEnabled && currentMoodTheme) {
+      root.setAttribute('data-mood', currentMoodTheme);
+    } else {
+      root.removeAttribute('data-mood');
+    }
+  }, [currentMoodTheme, appSettings.moodThemeEnabled]);
 
   const isScanningRef = useRef(false);
   const [isScanningUI, setIsScanningUI] = useState(false);

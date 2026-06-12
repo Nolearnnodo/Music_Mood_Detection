@@ -1,15 +1,144 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Righteous&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  background-color: #f8fafc; /* Slate 50 */
-  color: #0f172a; /* Slate 900 */
-  color-scheme: light;
+  /* ---------- 基础语义色:亮色 ---------- */
+  --bg-color: #f8fafc;
+  --card-color: #ffffff;
+  --text-color: #0f172a;
+  --border-color: #cbd5e1;
+
+  /* ---------- 默认强调色(中性蓝) ---------- */
+  --mood-accent:      #3b82f6;
+  --mood-accent-soft: #dbeafe;
+  --mood-accent-glow: #60a5fa;
+  --mood-accent-on:   #ffffff;
+
+  /* ---------- Aurora 流动背景的多色 stops ---------- */
+  --aurora-c1: rgba(99, 102, 241, 0.10);   /* indigo */
+  --aurora-c2: rgba(236, 72, 153, 0.08);   /* pink */
+  --aurora-c3: rgba(34, 197, 94, 0.06);    /* emerald */
 }
 
+/* ---------- 深色模式(Music Streaming 配色) ---------- */
 .dark {
-  background-color: #0f172a; /* Slate 900 */
-  color: #e2e8f0; /* Slate 200 */
-  color-scheme: dark;
+  --bg-color: #0F0F23;
+  --card-color: #1B1B30;
+  --text-color: #F8FAFC;
+  --border-color: #312E81;
+
+  --mood-accent:      #60a5fa;
+  --mood-accent-soft: #1e3a8a;
+  --mood-accent-glow: #93c5fd;
+
+  --aurora-c1: rgba(99, 102, 241, 0.42);
+  --aurora-c2: rgba(236, 72, 153, 0.32);
+  --aurora-c3: rgba(34, 197, 94, 0.20);
+}
+
+/* ---------- 7 套情绪主题 (亮色) ---------- */
+[data-mood="happy"]     { --mood-accent: #f59e0b; --mood-accent-soft: #fef3c7; --mood-accent-glow: #fbbf24; --aurora-c1: rgba(251, 191, 36, 0.12); --aurora-c2: rgba(245, 158, 11, 0.10); }
+[data-mood="calm"]      { --mood-accent: #14b8a6; --mood-accent-soft: #ccfbf1; --mood-accent-glow: #2dd4bf; --aurora-c1: rgba(20, 184, 166, 0.10); --aurora-c2: rgba(94, 234, 212, 0.10); }
+[data-mood="sad"]       { --mood-accent: #6366f1; --mood-accent-soft: #e0e7ff; --mood-accent-glow: #818cf8; --aurora-c1: rgba(99, 102, 241, 0.10); --aurora-c2: rgba(129, 140, 248, 0.10); }
+[data-mood="anxious"]   { --mood-accent: #94a3b8; --mood-accent-soft: #f1f5f9; --mood-accent-glow: #cbd5e1; --aurora-c1: rgba(148, 163, 184, 0.08); --aurora-c2: rgba(203, 213, 225, 0.08); }
+[data-mood="angry"]     { --mood-accent: #fb7185; --mood-accent-soft: #ffe4e6; --mood-accent-glow: #fda4af; --aurora-c1: rgba(251, 113, 133, 0.08); --aurora-c2: rgba(244, 114, 182, 0.08); }
+[data-mood="focused"]   { --mood-accent: #10b981; --mood-accent-soft: #d1fae5; --mood-accent-glow: #34d399; --aurora-c1: rgba(16, 185, 129, 0.10); --aurora-c2: rgba(52, 211, 153, 0.10); }
+[data-mood="energetic"] { --mood-accent: #ec4899; --mood-accent-soft: #fce7f3; --mood-accent-glow: #f472b6; --aurora-c1: rgba(236, 72, 153, 0.12); --aurora-c2: rgba(244, 114, 182, 0.10); }
+
+/* ---------- 7 套情绪主题 (暗色) ---------- */
+.dark[data-mood="happy"]     { --mood-accent: #fbbf24; --mood-accent-soft: #422006; --mood-accent-glow: #fcd34d; --aurora-c1: rgba(251, 191, 36, 0.48); --aurora-c2: rgba(245, 158, 11, 0.34); }
+.dark[data-mood="calm"]      { --mood-accent: #2dd4bf; --mood-accent-soft: #042f2e; --mood-accent-glow: #5eead4; --aurora-c1: rgba(45, 212, 191, 0.42); --aurora-c2: rgba(94, 234, 212, 0.28); }
+.dark[data-mood="sad"]       { --mood-accent: #818cf8; --mood-accent-soft: #1e1b4b; --mood-accent-glow: #a5b4fc; --aurora-c1: rgba(129, 140, 248, 0.46); --aurora-c2: rgba(99, 102, 241, 0.32); }
+.dark[data-mood="anxious"]   { --mood-accent: #cbd5e1; --mood-accent-soft: #1e293b; --mood-accent-glow: #e2e8f0; --aurora-c1: rgba(148, 163, 184, 0.22); --aurora-c2: rgba(203, 213, 225, 0.16); }
+.dark[data-mood="angry"]     { --mood-accent: #fda4af; --mood-accent-soft: #4c0519; --mood-accent-glow: #fecdd3; --aurora-c1: rgba(253, 113, 133, 0.46); --aurora-c2: rgba(244, 114, 182, 0.30); }
+.dark[data-mood="focused"]   { --mood-accent: #34d399; --mood-accent-soft: #022c22; --mood-accent-glow: #6ee7b7; --aurora-c1: rgba(52, 211, 153, 0.42); --aurora-c2: rgba(110, 231, 183, 0.30); }
+.dark[data-mood="energetic"] { --mood-accent: #f472b6; --mood-accent-soft: #500724; --mood-accent-glow: #f9a8d4; --aurora-c1: rgba(244, 114, 182, 0.50); --aurora-c2: rgba(236, 72, 153, 0.36); }
+
+/* ---------- 字体 ---------- */
+html { font-family: 'Poppins', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+.font-display { font-family: 'Righteous', 'Poppins', sans-serif; letter-spacing: 0.02em; }
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  transition: background-color 500ms ease, color 500ms ease;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ---------- Aurora 流动背景:两个超大色块缓慢飘动 ---------- */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 50%;
+  filter: blur(80px);
+  transition: background 800ms ease;
+}
+body::before {
+  top: -25vh; left: -15vw;
+  width: 85vw; height: 85vw;
+  background: radial-gradient(circle, var(--aurora-c1) 0%, transparent 65%);
+  animation: aurora-drift-1 22s ease-in-out infinite alternate;
+}
+body::after {
+  bottom: -25vh; right: -15vw;
+  width: 80vw; height: 80vw;
+  background: radial-gradient(circle, var(--aurora-c2) 0%, transparent 65%);
+  animation: aurora-drift-2 26s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-drift-1 {
+  0%   { transform: translate(0, 0)   scale(1); }
+  100% { transform: translate(15vw, 10vh) scale(1.15); }
+}
+@keyframes aurora-drift-2 {
+  0%   { transform: translate(0, 0)   scale(1); }
+  100% { transform: translate(-12vw, -8vh) scale(1.1); }
+}
+
+/* 让所有页面内容在 Aurora 层之上 */
+#root { position: relative; z-index: 1; }
+
+/* ---------- 通用细节 ---------- */
+.glass {
+  background-color: color-mix(in srgb, var(--card-color) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+}
+
+.skip-link {
+  position: fixed;
+  left: 0.5rem;
+  top: -3rem;        /* 默认藏在视口上方 */
+  z-index: 100;
+  padding: 0.5rem 0.75rem;
+  background: var(--mood-accent);
+  color: var(--mood-accent-on, #fff);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: top 200ms ease;
+}
+.skip-link:focus, .skip-link:focus-visible {
+  top: 0.5rem;
+  outline: 2px solid var(--mood-accent-glow);
+}
+
+/* 滚动条美化 (沿用项目原风格 + 适配主题) */
+.custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--border-color) 80%, transparent);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--mood-accent);
 }

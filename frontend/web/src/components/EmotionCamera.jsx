@@ -195,10 +195,10 @@ function EmotionCamera({ onEmotion, onGesture }) {
   useEffect(() => () => stopCamera(), []);
 
   return (
-    <div className="bg-mood-card border border-mood-border rounded-xl shadow-lg p-4 mb-4 flex flex-col gap-3">
+    <div className="glass border border-mood-border rounded-xl shadow-lg p-4 mb-4 flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          <Video size={18} className="text-blue-500 shrink-0"/>
+          <Video size={18} className="text-mood-accent shrink-0 transition-colors duration-500"/>
           <div className="min-w-0">
             <div className="text-sm font-bold text-mood-text">面部情绪识别</div>
             <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{status}</div>
@@ -206,10 +206,10 @@ function EmotionCamera({ onEmotion, onGesture }) {
         </div>
         <button
           onClick={isRunning || isLoading ? stopCamera : startCamera}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors ${
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-all duration-300 ${
             isRunning || isLoading
               ? 'bg-slate-200 dark:bg-slate-700 text-mood-text hover:bg-slate-300 dark:hover:bg-slate-600'
-              : 'bg-blue-600 hover:bg-blue-700 text-white'
+              : 'bg-mood-accent text-mood-accent-on hover:brightness-110 shadow-[0_0_18px_-4px_var(--mood-accent-glow)]'
           }`}
         >
           {isLoading ? <Loader2 size={14} className="animate-spin"/> : isRunning ? <CameraOff size={14}/> : <Camera size={14}/>}

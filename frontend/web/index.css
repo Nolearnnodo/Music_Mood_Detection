@@ -1,25 +1,2 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root {
-    /* 默认亮色模式 (Light Mode) 变量 */
-    --bg-color: #f1f5f9;      /* Slate 100 */
-    --card-color: #ffffff;    /* White */
-    --text-color: #0f172a;    /* Slate 900 */
-    --border-color: #cbd5e1;  /* Slate 300 */
-}
-
-/* 暗色模式 (Dark Mode) 变量 */
-.dark {
-    --bg-color: #0f172a;      /* Slate 900 */
-    --card-color: #1e293b;    /* Slate 800 */
-    --text-color: #f1f5f9;    /* Slate 100 */
-    --border-color: #334155;  /* Slate 700 */
-}
-
-body {
-    background-color: var(--bg-color);
-    color: var(--text-color);
-    transition: background-color 0.3s, color 0.3s;
-}
+/* 该文件未被 Vite 入口引用,仅用作历史占位。
+   真正生效的样式在 src/index.css。如需修改请改那个文件。 */

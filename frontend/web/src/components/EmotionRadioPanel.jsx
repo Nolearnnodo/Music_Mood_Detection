@@ -58,10 +58,10 @@ function EmotionRadioPanel({
   const confidence = stableEmotion?.confidence || candidate?.latest?.confidence || faceEmotion?.confidence || 0;
 
   return (
-    <div className="bg-mood-card border border-mood-border rounded-xl shadow-lg p-4 flex flex-col gap-3">
+    <div className="glass border border-mood-border rounded-xl shadow-lg p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Radio size={18} className="text-emerald-500"/>
+          <Radio size={18} className="text-mood-accent transition-colors duration-500"/>
           <div>
             <div className="text-sm font-bold text-mood-text">情绪音乐电台</div>
             <div className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -75,20 +75,22 @@ function EmotionRadioPanel({
       <div className="grid grid-cols-2 gap-2 text-xs">
         <button
           onClick={() => setStrategy('match')}
-          className={`rounded-lg px-3 py-2 border transition-colors ${
+          aria-pressed={strategy === 'match'}
+          className={`rounded-lg px-3 py-2 border transition-all duration-300 ${
             strategy === 'match'
-              ? 'bg-blue-600 text-white border-blue-600'
-              : 'bg-slate-100 dark:bg-slate-800 border-mood-border text-mood-text hover:bg-slate-200 dark:hover:bg-slate-700'
+              ? 'bg-mood-accent text-mood-accent-on border-mood-accent shadow-[0_0_18px_-4px_var(--mood-accent-glow)]'
+              : 'bg-slate-100/60 dark:bg-slate-800/60 border-mood-border text-mood-text hover:bg-mood-accent-soft'
           }`}
         >
           匹配心情
         </button>
         <button
           onClick={() => setStrategy('comfort')}
-          className={`rounded-lg px-3 py-2 border transition-colors ${
+          aria-pressed={strategy === 'comfort'}
+          className={`rounded-lg px-3 py-2 border transition-all duration-300 ${
             strategy === 'comfort'
-              ? 'bg-emerald-600 text-white border-emerald-600'
-              : 'bg-slate-100 dark:bg-slate-800 border-mood-border text-mood-text hover:bg-slate-200 dark:hover:bg-slate-700'
+              ? 'bg-mood-accent text-mood-accent-on border-mood-accent shadow-[0_0_18px_-4px_var(--mood-accent-glow)]'
+              : 'bg-slate-100/60 dark:bg-slate-800/60 border-mood-border text-mood-text hover:bg-mood-accent-soft'
           }`}
         >
           安抚心情
@@ -97,10 +99,11 @@ function EmotionRadioPanel({
 
       <button
         onClick={() => onAutoRefreshChange?.(!autoRefresh)}
-        className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs border transition-colors ${
+        aria-pressed={autoRefresh}
+        className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs border transition-all duration-300 ${
           autoRefresh
-            ? 'bg-indigo-600 text-white border-indigo-600'
-            : 'bg-slate-100 dark:bg-slate-800 border-mood-border text-mood-text hover:bg-slate-200 dark:hover:bg-slate-700'
+            ? 'bg-mood-accent text-mood-accent-on border-mood-accent shadow-[0_0_18px_-4px_var(--mood-accent-glow)]'
+            : 'bg-slate-100/60 dark:bg-slate-800/60 border-mood-border text-mood-text hover:bg-mood-accent-soft'
         }`}
       >
         <span className="flex items-center gap-1.5">
@@ -136,7 +139,7 @@ function EmotionRadioPanel({
       <button
         onClick={handleGenerate}
         disabled={!stableEmotion || !tracksReady || loading}
-        className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg py-2 text-xs font-medium flex items-center justify-center gap-2 transition-colors"
+        className="w-full bg-mood-accent hover:brightness-110 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:text-slate-500 disabled:hover:brightness-100 text-mood-accent-on rounded-lg py-2.5 text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-300 shadow-[0_0_24px_-6px_var(--mood-accent-glow)] hover:shadow-[0_0_32px_-4px_var(--mood-accent-glow)]"
       >
         {loading ? <Loader2 size={14} className="animate-spin"/> : <Sparkles size={14}/>}
         {loading ? '正在推荐' : '根据当前情绪推荐'}
@@ -150,7 +153,7 @@ function EmotionRadioPanel({
             </span>
             <button
               onClick={onPlay}
-              className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+              className="text-mood-accent hover:underline flex items-center gap-1 transition-colors duration-500"
             >
               <Play size={12}/> 播放
             </button>
