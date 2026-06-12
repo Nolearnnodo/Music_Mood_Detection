@@ -29,6 +29,7 @@ class WebServer {
     DatabaseManager &db;
     LibraryScanner &scanner;
     std::string web_root;
+    std::string music_dir;          // 用户上传音乐固定目录 (UTF-8)
     bool is_read_only;
     bool serve_static_files;
 
@@ -39,9 +40,21 @@ class WebServer {
 
 public:
     WebServer(DatabaseManager &_db, LibraryScanner &_sc, const std::string &_web_root,
+              const std::string &_music_dir,
               const std::string &host, int port, bool read_only, bool serve_static = true)
-        : db(_db), scanner(_sc), web_root(_web_root), is_read_only(read_only),
-          serve_static_files(serve_static) {
+        : db(_db), scanner(_sc), web_root(_web_root), music_dir(_music_dir),
+          is_read_only(read_only), serve_static_files(serve_static) {
+
+        // 确保上传目录存在
+        try {
+            std::filesystem::path mp = Encoding::to_fs_path(music_dir);
+            std::error_code ec;
+            std::filesystem::create_directories(mp, ec);
+            music_dir = Encoding::to_utf8_string(std::filesystem::absolute(mp, ec));
+            std::cout << "[Init] Music upload directory: " << music_dir << std::endl;
+        } catch (const std::exception &e) {
+            std::cerr << "[Warning] Failed to prepare music directory: " << e.what() << std::endl;
+        }
 
         auto dirs = db.get_directories();
         std::cout << "[Init] Checking configured directories..." << std::endl;
@@ -57,6 +70,19 @@ public:
             }
         }
 
+        // 把 Music_Directory 自动注册为扫描目录（如果尚未注册）
+        if (!music_dir.empty() && !is_read_only) {
+            bool already_active = false;
+            for (const auto &p : active_directories) {
+                if (p == music_dir) { already_active = true; break; }
+            }
+            if (!already_active) {
+                std::cout << "[Init] Registering Music_Directory: " << music_dir << std::endl;
+                db.add_directory(music_dir);
+                active_directories.push_back(music_dir);
+            }
+        }
+
         if (!active_directories.empty()) {
             std::cout << "[Init] Pruning missing files in " << active_directories.size() << " active directories..." << std::endl;
             db.prune_missing_tracks(active_directories);
@@ -66,6 +92,11 @@ public:
 
         scanner.start_workers(3);
         scanner.resume_scans();
+
+        // 启动后扫描 Music_Directory（识别用户手动放进去的歌曲）
+        if (!music_dir.empty() && !is_read_only) {
+            scanner.add_folder_async(music_dir);
+        }
 
         scanner.set_event_callback([this](const std::string &msg) {
             std::lock_guard<std::mutex> lock(sse_mtx);
@@ -457,6 +488,121 @@ private:
                 }
                 res.set_content(ss.str(), "text/plain");
             } catch (...) { res.status = 500; }
+        });
+
+        // =================================================================================
+        // Music Upload API
+        // =================================================================================
+        // 设置 multipart 上限以支持音频上传 (默认仅 8MB)
+        svr.set_payload_max_length(256 * 1024 * 1024); // 256MB
+
+        svr.Post("/api/music/upload", [&](const httplib::Request &req, httplib::Response &res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
+            if (is_read_only) {
+                res.status = 403;
+                res.set_content("{\"error\":\"Read-only mode\"}", "application/json");
+                return;
+            }
+            if (music_dir.empty()) {
+                res.status = 500;
+                res.set_content("{\"error\":\"Music directory not configured\"}", "application/json");
+                return;
+            }
+
+            try {
+                auto files = req.form.get_files("file");
+                if (files.empty()) {
+                    res.status = 400;
+                    res.set_content("{\"error\":\"No file provided\"}", "application/json");
+                    return;
+                }
+
+                static const std::vector<std::string> allowed_exts = {
+                    ".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac",
+                    ".ape", ".wma", ".wv", ".aiff"
+                };
+
+                json result_arr = json::array();
+                int uploaded = 0, skipped = 0;
+
+                for (const auto &f : files) {
+                    json item;
+                    item["original_name"] = f.filename;
+
+                    // 1. 取出基础文件名 (防止路径穿越)
+                    std::filesystem::path src_name(f.filename);
+                    std::string base_name = Encoding::to_utf8_string(src_name.filename());
+                    if (base_name.empty() || base_name == "." || base_name == "..") {
+                        item["status"] = "error";
+                        item["error"] = "Invalid filename";
+                        result_arr.push_back(item);
+                        skipped++;
+                        continue;
+                    }
+
+                    // 2. 扩展名校验
+                    std::string ext = Encoding::to_utf8_string(std::filesystem::path(base_name).extension());
+                    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                    bool ext_ok = false;
+                    for (const auto &e : allowed_exts) if (e == ext) { ext_ok = true; break; }
+                    if (!ext_ok) {
+                        item["status"] = "error";
+                        item["error"] = "Unsupported extension";
+                        result_arr.push_back(item);
+                        skipped++;
+                        continue;
+                    }
+
+                    // 3. 解决重名 (foo.mp3, foo_1.mp3, foo_2.mp3 ...)
+                    std::filesystem::path target_dir = Encoding::to_fs_path(music_dir);
+                    std::filesystem::path stem = std::filesystem::path(base_name).stem();
+                    std::filesystem::path final_path = target_dir / base_name;
+                    int counter = 1;
+                    std::error_code ec;
+                    while (std::filesystem::exists(final_path, ec) && counter < 10000) {
+                        std::string candidate = Encoding::to_utf8_string(stem) + "_" +
+                                                std::to_string(counter) + ext;
+                        final_path = target_dir / Encoding::to_fs_path(candidate);
+                        counter++;
+                    }
+
+                    // 4. 写入文件 (二进制)
+                    std::ofstream ofs(final_path, std::ios::binary);
+                    if (!ofs) {
+                        item["status"] = "error";
+                        item["error"] = "Cannot write file";
+                        result_arr.push_back(item);
+                        skipped++;
+                        continue;
+                    }
+                    ofs.write(f.content.data(), static_cast<std::streamsize>(f.content.size()));
+                    ofs.close();
+
+                    // 5. 入队分析
+                    std::string saved_u8 = Encoding::to_utf8_string(final_path);
+                    auto [tid, queued] = scanner.enqueue_single_file(saved_u8);
+
+                    item["status"] = "ok";
+                    item["track_id"] = tid;
+                    item["filename"] = Encoding::to_utf8_string(final_path.filename());
+                    item["relative_path"] = std::string("Music_Directory/") +
+                                            Encoding::to_utf8_string(final_path.filename());
+                    item["queued"] = queued;
+                    result_arr.push_back(item);
+                    uploaded++;
+                }
+
+                json out;
+                out["uploaded"] = uploaded;
+                out["skipped"] = skipped;
+                out["items"] = result_arr;
+                res.set_content(out.dump(), "application/json");
+            } catch (const std::exception &e) {
+                res.status = 500;
+                json err;
+                err["error"] = std::string("Upload failed: ") + e.what();
+                res.set_content(err.dump(), "application/json");
+            }
         });
 
         // FS Browse

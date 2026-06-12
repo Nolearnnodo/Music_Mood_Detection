@@ -18,6 +18,15 @@ node_modules/
 
 # Local music library, do not push personal/copyrighted songs
 My_music/
+Music_Directory/*
+!Music_Directory/.gitkeep
+
+# Claude Code workspace
+.claude/
+
+# Scratch images / archives
+image.png
+*.tar
 
 # OS / editor
 .DS_Store

@@ -17,6 +17,7 @@ void print_help(const char *prog_name) {
             << "  --api-only        Start API server without serving built frontend files\n"
             << "  --web-root <dir>  Static frontend directory (default: ./web)\n"
             << "  --model-dir <dir> AI model directory (default: ./models)\n"
+            << "  --music-dir <dir> User upload directory (default: ./Music_Directory)\n"
             << "  --help            Show this help\n";
 }
 
@@ -24,6 +25,7 @@ int main(int argc, char *argv[]) {
     // 默认配置
     std::string model_dir = "./models";
     std::string web_root = "./web";
+    std::string music_dir = "./Music_Directory";
     std::string db_path = "music_mood.db";
     std::string host = "127.0.0.1";
     int port = 8080;
@@ -51,6 +53,8 @@ int main(int argc, char *argv[]) {
             web_root = argv[++i];
         } else if (arg == "--model-dir" && i + 1 < argc) {
             model_dir = argv[++i];
+        } else if (arg == "--music-dir" && i + 1 < argc) {
+            music_dir = argv[++i];
         } else if (arg == "--help") {
             print_help(argv[0]);
             return 0;
@@ -67,7 +71,8 @@ int main(int argc, char *argv[]) {
             << "Vulkan: " << (use_vulkan ? "Enabled" : "Disabled") << "\n"
             << "Read-Only: " << (read_only ? "Yes" : "No") << "\n";
     std::cout << "API Only: " << (api_only ? "Yes" : "No") << "\n"
-            << "Model Dir: " << model_dir << "\n";
+            << "Model Dir: " << model_dir << "\n"
+            << "Music Dir: " << music_dir << "\n";
     if (!api_only) {
         std::cout << "Web Root: " << web_root << "\n";
     }
@@ -91,7 +96,7 @@ int main(int argc, char *argv[]) {
 
         // 4. 启动 Web 服务器 (阻塞运行)
         // 传入 host 和 port, read_only
-        WebServer server(db, scanner, web_root, host, port, read_only, !api_only);
+        WebServer server(db, scanner, web_root, music_dir, host, port, read_only, !api_only);
     } catch (const std::exception &e) {
         std::cerr << "Fatal Error: " << e.what() << std::endl;
         return -1;

@@ -131,6 +131,17 @@ public:
         }).detach();
     }
 
+    // 把单个文件加入分析队列。返回 {track_id, queued}。
+    // queued=false 表示文件之前已分析完成，未重新入队。
+    std::pair<int, bool> enqueue_single_file(const std::string &utf8_file_path) {
+        auto [id, is_new] = db.add_or_get_track(utf8_file_path);
+        if (is_new) {
+            task_queue.push({id, utf8_file_path});
+            broadcast_progress();
+        }
+        return {id, is_new};
+    }
+
     void add_folder_async(const std::string &utf8_folder_path) {
         // 复制一份 path 避免 lambda 引用失效
         std::string folder_path_copy = utf8_folder_path;
