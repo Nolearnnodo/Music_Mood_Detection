@@ -2,6 +2,7 @@ import axios from 'axios';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import { useEmotionLog } from '../hooks/useEmotionLog';
+import { getTimeSlot } from '../timeSlot';
 
 const AppStateContext = createContext(null);
 
@@ -299,6 +300,24 @@ export function AppStateProvider({ children }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 当前时段(每分钟自动更新)
+  const [currentTimeSlot, setCurrentTimeSlot] = useState(() => getTimeSlot());
+  useEffect(() => {
+    const id = setInterval(() => setCurrentTimeSlot(getTimeSlot()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // 一键用当前时段触发推荐
+  const handleTimeSlotRecommend = useCallback(async () => {
+    const slot = getTimeSlot();
+    await handleEmotionGenerate({
+      faceEmotion: { label: slot.theme, confidence: 1, source: 'time' },
+      moodTarget: slot.target,
+      strategy: slot.target.strategy
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // 聊天:LLM 返回 mood + target 后,等价于一次 handleEmotionGenerate
   const handleChatRecommendation = useCallback(async (chatResult) => {
     if (!chatResult?.mood || !chatResult?.target) return null;
@@ -379,6 +398,7 @@ export function AppStateProvider({ children }) {
     handleEmotionGenerate, handleEmotionPlay, handlePlaylistLow,
     handleHeadGesture, handleStableEmotionChange,
     handleChatRecommendation,
+    currentTimeSlot, handleTimeSlotRecommend,
     fetchTracks, refreshScanStatus: startSSE
   };
 

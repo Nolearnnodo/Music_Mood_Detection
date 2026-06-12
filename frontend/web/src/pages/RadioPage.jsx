@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Camera, Hand, Sparkles, Upload as UploadIcon } from 'lucide-react';
+import { Camera, Clock, Hand, Loader2, Play, Sparkles, Upload as UploadIcon } from 'lucide-react';
 
 import EmotionCamera from '../components/EmotionCamera';
 import EmotionRadioPanel from '../components/EmotionRadioPanel';
@@ -20,7 +20,9 @@ function RadioPage() {
     handleHeadGesture,
     handleEmotionGenerate,
     handleEmotionPlay,
-    handleStableEmotionChange
+    handleStableEmotionChange,
+    currentTimeSlot,
+    handleTimeSlotRecommend
   } = useAppState();
 
   const hasTracks = tracks.length > 0;
@@ -46,6 +48,31 @@ function RadioPage() {
               <Link to="/upload" className="inline-flex items-center gap-1 text-mood-accent hover:underline">
                 <UploadIcon size={12}/> 去上传
               </Link>
+            </div>
+          )}
+
+          {/* 当前时段电台 */}
+          {currentTimeSlot && (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-mood-accent-soft border border-mood-accent/30 text-mood-text text-xs">
+                <Clock size={12} className="text-mood-accent"/>
+                <span className="text-lg leading-none">{currentTimeSlot.emoji}</span>
+                <span className="font-medium">{currentTimeSlot.label}</span>
+                <span className="font-mono text-[10px] text-slate-500">
+                  V {currentTimeSlot.target.v.toFixed(1)} / A {currentTimeSlot.target.a.toFixed(1)}
+                </span>
+              </div>
+              <button
+                onClick={handleTimeSlotRecommend}
+                disabled={!hasTracks || isEmotionLoading}
+                className="text-xs px-3 py-1.5 rounded-full bg-mood-accent text-mood-accent-on hover:brightness-110 disabled:opacity-50 flex items-center gap-1 transition-all duration-300 shadow-[0_0_18px_-4px_var(--mood-accent-glow)]"
+              >
+                {isEmotionLoading ? <Loader2 size={12} className="animate-spin"/> : <Play size={12}/>}
+                用时段电台
+              </button>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                {currentTimeSlot.target.description}
+              </span>
             </div>
           )}
         </div>
