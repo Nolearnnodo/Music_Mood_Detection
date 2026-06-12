@@ -24,7 +24,8 @@ function GlobalPlayer() {
     handlePlaylistExportFromPlayer,
     autoRefresh,
     handlePlaylistLow,
-    skipSongTrigger
+    skipSongTrigger,
+    prevSongTrigger
   } = useAppState();
 
   if (!visible) return null;
@@ -47,6 +48,7 @@ function GlobalPlayer() {
         autoRefresh={autoRefresh}
         onPlaylistLow={handlePlaylistLow}
         skipSongTrigger={skipSongTrigger}
+        prevSongTrigger={prevSongTrigger}
       />
     </div>
   );

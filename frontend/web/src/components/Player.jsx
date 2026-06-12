@@ -26,7 +26,8 @@ function Player({
   playlistLabel = '播放列表',
   autoRefresh = false,
   onPlaylistLow,
-  skipSongTrigger = 0
+  skipSongTrigger = 0,
+  prevSongTrigger = 0
 }) {
   const playerRef = useRef(null);
   const activeTrackRef = useRef(null);
@@ -210,6 +211,12 @@ function Player({
       setErrorMsg(null);
     }
   };
+
+  useEffect(() => {
+    if (prevSongTrigger > 0) {
+      handleClickPrev();
+    }
+  }, [prevSongTrigger]);
 
   const handleJumpTo = index => {
     setCurrentIndex(index);

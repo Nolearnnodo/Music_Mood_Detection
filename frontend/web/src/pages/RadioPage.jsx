@@ -51,7 +51,7 @@ function RadioPage() {
             <div className="flex items-center gap-2 mb-3 text-sm font-bold text-mood-text">
               <Camera size={16} className="text-blue-500"/> 面部情绪识别
               <span className="text-[10px] text-slate-500 dark:text-slate-400 font-normal ml-2">
-                摇头可切到下一首
+                头朝右 = 下一首 · 头朝左 = 上一首
               </span>
             </div>
             <EmotionCamera

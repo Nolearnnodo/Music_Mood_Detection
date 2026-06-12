@@ -18,6 +18,8 @@ export function AppStateProvider({ children }) {
   const [manualEmotion, setManualEmotion] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [skipSongTrigger, setSkipSongTrigger] = useState(0);
+  const [prevSongTrigger, setPrevSongTrigger] = useState(0);
+  const [pauseToggleTrigger, setPauseToggleTrigger] = useState(0);
   const lastEmotionParamsRef = useRef(null);
 
   const [emotionPlaylist, setEmotionPlaylist] = useState([]);
@@ -269,9 +271,26 @@ export function AppStateProvider({ children }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 摄像头摇头手势 → 切歌
+  // 摄像头手势分发:
+  //   swipe_right → 下一首
+  //   swipe_left  → 上一首
+  //   shake       → 也作为切歌(向后兼容,等价于 swipe_right)
+  //   nod         → 暂停/播放(预留)
   const handleHeadGesture = useCallback((type) => {
-    if (type === 'shake') setSkipSongTrigger(v => v + 1);
+    switch (type) {
+      case 'swipe_right':
+      case 'shake':
+        setSkipSongTrigger(v => v + 1);
+        break;
+      case 'swipe_left':
+        setPrevSongTrigger(v => v + 1);
+        break;
+      case 'nod':
+        setPauseToggleTrigger(v => v + 1);
+        break;
+      default:
+        break;
+    }
   }, []);
 
   // 稳定情绪变化时直接写入日志(不一定触发推荐)
@@ -284,7 +303,7 @@ export function AppStateProvider({ children }) {
     playlistItems, faceEmotion, setFaceEmotion,
     manualEmotion, setManualEmotion,
     autoRefresh, setAutoRefresh,
-    skipSongTrigger,
+    skipSongTrigger, prevSongTrigger, pauseToggleTrigger,
     emotionPlaylist, emotionPlaylistVersion, emotionStartIndex,
     isEmotionLoading, emotionPlaylistLabel,
     emotionLogs, addEmotionLog, clearEmotionLogs, emotionStats,
