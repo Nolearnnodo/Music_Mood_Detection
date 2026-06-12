@@ -1,5 +1,5 @@
-import { Brain, ListMusic, Loader2, Play, Radio, Sparkles } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Brain, ListMusic, Loader2, Play, Radio, RefreshCcw, Sparkles } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   getFaceEmotionEmoji,
@@ -10,14 +10,39 @@ import { useStableFaceEmotion } from '../hooks/useStableFaceEmotion';
 
 function EmotionRadioPanel({
   faceEmotion,
+  manualEmotion,
+  autoRefresh,
+  onAutoRefreshChange,
   onGenerate,
   onPlay,
+  onStableChange,
   playlist,
   loading,
   tracksReady
 }) {
   const [strategy, setStrategy] = useState('match');
-  const { stableEmotion, candidate } = useStableFaceEmotion(faceEmotion);
+  const { stableEmotion: camStable, candidate } = useStableFaceEmotion(faceEmotion);
+
+  const stableEmotion = manualEmotion || camStable;
+
+  const lastStableLabelRef = useRef(null);
+
+  useEffect(() => {
+    if (!camStable?.label) return;
+    if (manualEmotion) return;
+    if (camStable.label === lastStableLabelRef.current) return;
+    lastStableLabelRef.current = camStable.label;
+
+    const target = getMoodTarget(camStable.label, strategy);
+    onStableChange?.({
+      emotion: camStable.label,
+      confidence: camStable.confidence,
+      source: 'camera',
+      valence: target.v,
+      arousal: target.a,
+      strategy
+    });
+  }, [camStable, manualEmotion, strategy, onStableChange]);
 
   const moodTarget = useMemo(() => {
     if (!stableEmotion?.label) return null;
@@ -70,6 +95,23 @@ function EmotionRadioPanel({
         </button>
       </div>
 
+      <button
+        onClick={() => onAutoRefreshChange?.(!autoRefresh)}
+        className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs border transition-colors ${
+          autoRefresh
+            ? 'bg-indigo-600 text-white border-indigo-600'
+            : 'bg-slate-100 dark:bg-slate-800 border-mood-border text-mood-text hover:bg-slate-200 dark:hover:bg-slate-700'
+        }`}
+      >
+        <span className="flex items-center gap-1.5">
+          <RefreshCcw size={13} className={autoRefresh ? 'animate-[spin_3s_linear_infinite]' : ''} />
+          持续电台
+        </span>
+        <span className="text-[10px] opacity-80">
+          {autoRefresh ? 'ON' : 'OFF'}
+        </span>
+      </button>
+
       <div className="rounded-lg bg-slate-100 dark:bg-slate-900/50 border border-mood-border p-3 text-xs flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <span className="text-slate-500 dark:text-slate-400">当前稳定情绪</span>
@@ -85,7 +127,9 @@ function EmotionRadioPanel({
           </span>
         </div>
         <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-          {moodTarget?.description || '开启摄像头并保持表情稳定后，系统会给出推荐目标。'}
+          {moodTarget?.description || (manualEmotion
+            ? '已通过手动选择确定当前情绪。'
+            : '开启摄像头并保持表情稳定后，系统会给出推荐目标。')}
         </div>
       </div>
 

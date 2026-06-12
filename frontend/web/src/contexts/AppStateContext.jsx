@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
+import { useEmotionLog } from '../hooks/useEmotionLog';
+
 const AppStateContext = createContext(null);
 
 export function AppStateProvider({ children }) {
@@ -13,11 +15,25 @@ export function AppStateProvider({ children }) {
   const [playlistItems, setPlaylistItems] = useState([]);
 
   const [faceEmotion, setFaceEmotion] = useState(null);
+  const [manualEmotion, setManualEmotion] = useState(null);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [skipSongTrigger, setSkipSongTrigger] = useState(0);
+  const lastEmotionParamsRef = useRef(null);
+
   const [emotionPlaylist, setEmotionPlaylist] = useState([]);
   const [emotionPlaylistVersion, setEmotionPlaylistVersion] = useState(0);
   const [emotionStartIndex, setEmotionStartIndex] = useState(0);
   const [isEmotionLoading, setIsEmotionLoading] = useState(false);
   const [emotionPlaylistLabel, setEmotionPlaylistLabel] = useState('情绪推荐歌单');
+
+  const {
+    logs: emotionLogs,
+    addEntry: addEmotionLog,
+    clearLogs: clearEmotionLogs,
+    stats: emotionStats,
+    entriesByDay: emotionEntriesByDay,
+    entriesByWeek: emotionEntriesByWeek
+  } = useEmotionLog();
 
   const [appSettings, setAppSettings] = useState(() => {
     const saved = localStorage.getItem('mood_settings');
@@ -181,6 +197,15 @@ export function AppStateProvider({ children }) {
 
   const handleEmotionGenerate = async ({ faceEmotion: stableEmotion, moodTarget, strategy }) => {
     if (!stableEmotion || !moodTarget) return;
+    lastEmotionParamsRef.current = { faceEmotion: stableEmotion, moodTarget, strategy };
+    addEmotionLog({
+      emotion: stableEmotion.label,
+      confidence: stableEmotion.confidence,
+      source: stableEmotion.source || (manualEmotion ? 'manual' : 'camera'),
+      valence: moodTarget.v,
+      arousal: moodTarget.a,
+      strategy
+    });
     setIsEmotionLoading(true);
     try {
       const baseR = moodTarget.radius || playlistRadius;
@@ -236,17 +261,41 @@ export function AppStateProvider({ children }) {
     setPlaylistItems(emotionPlaylist);
   };
 
+  // 当播放列表到末尾且开启自动续推时,用最近一次推荐参数重新生成
+  const handlePlaylistLow = useCallback(() => {
+    if (lastEmotionParamsRef.current) {
+      handleEmotionGenerate(lastEmotionParamsRef.current);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 摄像头摇头手势 → 切歌
+  const handleHeadGesture = useCallback((type) => {
+    if (type === 'shake') setSkipSongTrigger(v => v + 1);
+  }, []);
+
+  // 稳定情绪变化时直接写入日志(不一定触发推荐)
+  const handleStableEmotionChange = useCallback((entry) => {
+    addEmotionLog(entry);
+  }, [addEmotionLog]);
+
   const value = {
     tracks, scanStatus, selectedTrack, currentTrack, trajectory, currentTime, setCurrentTime,
     playlistItems, faceEmotion, setFaceEmotion,
+    manualEmotion, setManualEmotion,
+    autoRefresh, setAutoRefresh,
+    skipSongTrigger,
     emotionPlaylist, emotionPlaylistVersion, emotionStartIndex,
     isEmotionLoading, emotionPlaylistLabel,
+    emotionLogs, addEmotionLog, clearEmotionLogs, emotionStats,
+    emotionEntriesByDay, emotionEntriesByWeek,
     appSettings, playlistRadius, setPlaylistRadius,
     theme, isDark, toggleTheme,
     isScanningUI,
     handleSaveSettings, handleAddFolder, handleChartClick,
     handlePlayerTrackChange, handleExportPreset, handlePlaylistExportFromPlayer,
-    handleEmotionGenerate, handleEmotionPlay,
+    handleEmotionGenerate, handleEmotionPlay, handlePlaylistLow,
+    handleHeadGesture, handleStableEmotionChange,
     fetchTracks, refreshScanStatus: startSSE
   };
 

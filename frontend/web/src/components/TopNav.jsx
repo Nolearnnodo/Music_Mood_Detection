@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
-  Laptop, ListMusic, MessageCircle, Moon, Music, Radio,
+  Laptop, ListMusic, MessageCircle, Moon, Music, NotebookText, Radio,
   Settings as SettingsIcon, Sparkles, Sun, Upload
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -9,10 +9,11 @@ import { useAppState } from '../contexts/AppStateContext';
 
 const NAV_ITEMS = [
   { to: '/radio', label: '电台', icon: Radio },
-  { to: '/chat', label: '聊天推荐', icon: MessageCircle },
+  { to: '/chat', label: '聊天', icon: MessageCircle },
   { to: '/library', label: '音乐库', icon: ListMusic },
   { to: '/upload', label: '上传', icon: Upload },
   { to: '/mood', label: '情绪图谱', icon: Sparkles },
+  { to: '/journal', label: '心情日志', icon: NotebookText },
   { to: '/settings', label: '设置', icon: SettingsIcon }
 ];
 
