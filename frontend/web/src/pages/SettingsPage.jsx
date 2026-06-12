@@ -59,11 +59,11 @@ function SettingsPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto flex flex-col gap-4">
-      <div className="bg-mood-card border border-mood-border rounded-xl p-4">
+    <div className="p-4 md:p-6 max-w-3xl mx-auto flex flex-col gap-4 pb-8">
+      <div className="glass border border-mood-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-1">
-          <SettingsIcon size={18} className="text-blue-500"/>
-          <h1 className="text-lg font-bold text-mood-text">设置</h1>
+          <SettingsIcon size={18} className="text-mood-accent transition-colors duration-500"/>
+          <h1 className="font-display text-xl text-mood-text tracking-wide">设置</h1>
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400">
           管理监控目录、推荐参数与隐私选项。新上传的音乐统一保存在
@@ -80,9 +80,9 @@ function SettingsPage() {
         isScanning={isScanningUI}
       />
 
-      <div className="bg-mood-card border border-mood-border rounded-xl p-4 flex flex-col gap-3">
+      <div className="glass border border-mood-border rounded-xl p-4 flex flex-col gap-3">
         <div className="flex items-center gap-2 text-sm font-bold text-mood-text">
-          <Wand2 size={16} className="text-emerald-500"/> 情绪重新分析
+          <Wand2 size={16} className="text-mood-accent transition-colors duration-500"/> 情绪重新分析
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
           后端 ncnn 推理目前会写入异常 V/A,所以本应用用 <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">scripts/analyze_all.py</code>
@@ -92,7 +92,7 @@ function SettingsPage() {
           <button
             onClick={() => triggerReanalyze(false)}
             disabled={reanalyzing}
-            className="text-xs px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 flex items-center gap-1"
+            className="text-xs px-3 py-1.5 rounded-md bg-mood-accent text-mood-accent-on hover:brightness-110 disabled:bg-slate-300 dark:disabled:bg-slate-600 disabled:hover:brightness-100 flex items-center gap-1 transition-all duration-300 shadow-[0_0_18px_-4px_var(--mood-accent-glow)]"
           >
             {reanalyzing
               ? <Loader2 size={12} className="animate-spin"/>
@@ -102,7 +102,7 @@ function SettingsPage() {
           <button
             onClick={() => triggerReanalyze(true)}
             disabled={reanalyzing}
-            className="text-xs px-3 py-1.5 rounded-md border border-mood-border text-mood-text hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 flex items-center gap-1"
+            className="text-xs px-3 py-1.5 rounded-md border border-mood-border text-mood-text hover:bg-mood-accent-soft disabled:opacity-50 flex items-center gap-1 transition-colors"
           >
             重新分析全库
           </button>

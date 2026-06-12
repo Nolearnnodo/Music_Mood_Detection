@@ -45,9 +45,9 @@ function ManualEmotionSelector({ onSelect }) {
   };
 
   return (
-    <div className="bg-mood-card border border-mood-border rounded-xl shadow-lg p-4 mb-4 flex flex-col gap-3">
+    <div className="glass border border-mood-border rounded-xl shadow-lg p-4 mb-4 flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <Hand size={18} className="text-cyan-500 shrink-0" />
+        <Hand size={18} className="text-mood-accent shrink-0 transition-colors duration-500" />
         <div>
           <div className="text-sm font-bold text-mood-text">手动选择情绪</div>
           <div className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -74,11 +74,12 @@ function ManualEmotionSelector({ onSelect }) {
               key={label}
               onClick={() => handleSelect(label)}
               title={mood?.description || ''}
+              aria-pressed={isActive}
               className={`
-                flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all duration-200
+                flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all duration-300
                 ${isActive
-                  ? `border-current ring-2 ${ring} bg-slate-100 dark:bg-slate-800 scale-105`
-                  : 'border-mood-border hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-900/50'
+                  ? 'border-mood-accent bg-mood-accent-soft scale-105 shadow-[0_0_20px_-4px_var(--mood-accent-glow)]'
+                  : 'border-mood-border hover:border-mood-accent/50 hover:bg-mood-accent-soft/40'
                 }
               `}
             >
@@ -95,7 +96,7 @@ function ManualEmotionSelector({ onSelect }) {
       </div>
 
       {activeLabel && (
-        <div className="flex items-center gap-2 text-[11px] text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-2">
+        <div className="flex items-center gap-2 text-[11px] text-mood-accent bg-mood-accent-soft border border-mood-accent/30 rounded-lg p-2 transition-colors duration-500">
           <MousePointerClick size={14} />
           <span>
             已手动选择「{FACE_EMOTION_LABELS[activeLabel]}」,

@@ -30,18 +30,18 @@ function LibraryPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-4">
-      <div className="bg-mood-card border border-mood-border rounded-xl p-4">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto flex flex-col gap-4 pb-32">
+      <div className="glass border border-mood-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-1">
-          <ListMusic size={18} className="text-blue-500"/>
-          <h1 className="text-lg font-bold text-mood-text">音乐库</h1>
+          <ListMusic size={18} className="text-mood-accent transition-colors duration-500"/>
+          <h1 className="font-display text-xl text-mood-text tracking-wide">音乐库</h1>
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400">
           已分析 {scanStatus.done} 首 · 失败 {scanStatus.failed} 首 · 总计 {scanStatus.total} 首
         </p>
       </div>
 
-      <div className="bg-mood-card border border-mood-border rounded-xl p-4 flex flex-col gap-3">
+      <div className="glass border border-mood-border rounded-xl p-4 flex flex-col gap-3">
         <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
           <div className="relative flex-1">
             <Search size={14} className="absolute left-3 top-2.5 text-slate-400 pointer-events-none"/>
@@ -50,7 +50,7 @@ function LibraryPage() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="按歌名搜索..."
-              className="w-full bg-slate-50 dark:bg-slate-800 text-mood-text pl-9 pr-3 py-2 rounded-lg border border-mood-border focus:outline-none focus:border-blue-500 text-sm"
+              className="w-full bg-slate-50/60 dark:bg-slate-800/60 text-mood-text pl-9 pr-3 py-2 rounded-lg border border-mood-border focus:outline-none focus:border-mood-accent focus:ring-2 focus:ring-mood-accent-soft text-sm transition-colors"
             />
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -59,10 +59,11 @@ function LibraryPage() {
               <button
                 key={q.id}
                 onClick={() => setQuadrant(q.id)}
-                className={`text-xs px-2 py-1 rounded-md border ${
+                aria-pressed={quadrant === q.id}
+                className={`text-xs px-2 py-1 rounded-md border transition-all duration-300 ${
                   quadrant === q.id
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-slate-50 dark:bg-slate-800 border-mood-border text-mood-text hover:bg-slate-100 dark:hover:bg-slate-700'
+                    ? 'bg-mood-accent text-mood-accent-on border-mood-accent shadow-[0_0_14px_-4px_var(--mood-accent-glow)]'
+                    : 'bg-slate-50/60 dark:bg-slate-800/60 border-mood-border text-mood-text hover:bg-mood-accent-soft'
                 }`}
               >
                 {q.label}
@@ -83,7 +84,7 @@ function LibraryPage() {
             <button
               key={t.id}
               onClick={() => handlePlay(idx)}
-              className="w-full flex items-center gap-3 px-4 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800 border-b last:border-b-0 border-mood-border transition-colors"
+              className="w-full flex items-center gap-3 px-4 py-2 text-left text-sm hover:bg-mood-accent-soft border-b last:border-b-0 border-mood-border transition-colors"
               title={t.title}
             >
               <span className="font-mono text-xs opacity-50 w-8 shrink-0">{idx + 1}</span>
@@ -91,7 +92,7 @@ function LibraryPage() {
               <span className="font-mono text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
                 V {t.v?.toFixed(1)} / A {t.a?.toFixed(1)}
               </span>
-              <Play size={14} className="text-blue-500 shrink-0"/>
+              <Play size={14} className="text-mood-accent shrink-0 transition-colors duration-500"/>
             </button>
           ))}
         </div>

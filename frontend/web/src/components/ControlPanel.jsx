@@ -100,7 +100,7 @@ function ControlPanel({ onAddFolder, scanStatus, onExport, onOpenSettings, readO
 
   return (
     <>
-      <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-lg mb-4 border border-gray-200 dark:border-slate-700">
+      <div className="glass p-4 rounded-xl shadow-lg mb-4 border border-mood-border">
         <div className="flex flex-col gap-4">
           {/* 添加目录 */}
           {/* 只读模式下隐藏添加功能 */}
@@ -121,7 +121,7 @@ function ControlPanel({ onAddFolder, scanStatus, onExport, onOpenSettings, readO
                   />
                 </div>
                 <button onClick={handleAddClick} disabled={isAdding}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap flex items-center gap-1">
+                  className="bg-mood-accent hover:brightness-110 disabled:bg-gray-300 dark:disabled:bg-slate-600 text-mood-accent-on px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap flex items-center gap-1 transition-all duration-300 shadow-[0_0_18px_-4px_var(--mood-accent-glow)]">
                   {isAdding ? '...' : <><Plus size={16}/> 添加</>}
                 </button>
               </div>

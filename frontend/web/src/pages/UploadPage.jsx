@@ -124,11 +124,11 @@ function UploadPage() {
   const doneCount = items.filter(i => i.status === 'done').length;
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl mx-auto flex flex-col gap-4">
-      <div className="bg-mood-card border border-mood-border rounded-xl p-4">
+    <div className="p-4 md:p-6 max-w-3xl mx-auto flex flex-col gap-4 pb-32">
+      <div className="glass border border-mood-border rounded-xl p-4">
         <div className="flex items-center gap-2 mb-1">
-          <Upload size={18} className="text-blue-500"/>
-          <h1 className="text-lg font-bold text-mood-text">上传音乐</h1>
+          <Upload size={18} className="text-mood-accent transition-colors duration-500"/>
+          <h1 className="font-display text-xl text-mood-text tracking-wide">上传音乐</h1>
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400">
           上传后会保存到项目内 <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">Music_Directory/</code>，并自动调用 Python 离线分析器。
@@ -136,9 +136,9 @@ function UploadPage() {
       </div>
 
       {(analyzing || analyzeMsg) && (
-        <div className={`rounded-xl border p-3 flex items-center gap-3 text-sm ${
+        <div className={`rounded-xl border p-3 flex items-center gap-3 text-sm transition-colors duration-500 ${
           analyzing
-            ? 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-300'
+            ? 'bg-mood-accent-soft border-mood-accent/40 text-mood-accent'
             : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
         }`}>
           {analyzing && <Loader2 size={16} className="animate-spin shrink-0"/>}
@@ -152,13 +152,13 @@ function UploadPage() {
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${
+        className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-300 ${
           isDragging
-            ? 'border-blue-500 bg-blue-500/10'
-            : 'border-mood-border bg-mood-card hover:bg-slate-50 dark:hover:bg-slate-800/50'
+            ? 'border-mood-accent bg-mood-accent-soft shadow-[0_0_30px_-6px_var(--mood-accent-glow)]'
+            : 'border-mood-border glass hover:border-mood-accent/60'
         }`}
       >
-        <FolderOpen size={32} className="mx-auto text-blue-500 mb-3"/>
+        <FolderOpen size={32} className="mx-auto text-mood-accent mb-3 transition-colors duration-500"/>
         <div className="text-sm text-mood-text font-medium mb-1">点击或拖拽文件到此处</div>
         <div className="text-xs text-slate-500 dark:text-slate-400">
           支持 {ALLOWED_EXTS.join(' / ')}，单文件 ≤ {MAX_FILE_MB}MB
@@ -174,7 +174,7 @@ function UploadPage() {
       </div>
 
       {items.length > 0 && (
-        <div className="bg-mood-card border border-mood-border rounded-xl p-4 flex flex-col gap-3">
+        <div className="glass border border-mood-border rounded-xl p-4 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <div className="text-sm font-medium text-mood-text">
               待上传 {pendingCount} · 已完成 {doneCount} · 共 {items.length}
@@ -183,14 +183,14 @@ function UploadPage() {
               <button
                 onClick={handleClear}
                 disabled={busy}
-                className="text-xs px-3 py-1.5 rounded-md border border-mood-border text-mood-text hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50"
+                className="text-xs px-3 py-1.5 rounded-md border border-mood-border text-mood-text hover:bg-mood-accent-soft disabled:opacity-50 transition-colors"
               >
                 清空
               </button>
               <button
                 onClick={handleUpload}
                 disabled={busy || pendingCount === 0}
-                className="text-xs px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 flex items-center gap-1"
+                className="text-xs px-3 py-1.5 rounded-md bg-mood-accent text-mood-accent-on hover:brightness-110 disabled:bg-slate-300 dark:disabled:bg-slate-600 disabled:hover:brightness-100 flex items-center gap-1 transition-all duration-300 shadow-[0_0_18px_-4px_var(--mood-accent-glow)]"
               >
                 {busy && <Loader2 size={12} className="animate-spin"/>}
                 开始上传
@@ -225,9 +225,9 @@ function UploadPage() {
           {doneCount > 0 && (
             <div className="text-xs text-slate-500 dark:text-slate-400">
               已加入分析队列。可前往
-              <Link to="/library" className="text-blue-600 dark:text-blue-400 hover:underline mx-1">音乐库</Link>
+              <Link to="/library" className="text-mood-accent hover:underline mx-1 transition-colors duration-500">音乐库</Link>
               查看进度，或回到
-              <Link to="/radio" className="text-blue-600 dark:text-blue-400 hover:underline mx-1">电台</Link>
+              <Link to="/radio" className="text-mood-accent hover:underline mx-1 transition-colors duration-500">电台</Link>
               。
             </div>
           )}
