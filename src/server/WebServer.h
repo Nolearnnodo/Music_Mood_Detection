@@ -702,6 +702,58 @@ private:
             res.set_content(j.dump(), "application/json");
         });
 
+        // =================================================================================
+        // LLM Chat (proxy to scripts/llm_chat.py)
+        // =================================================================================
+        svr.Post("/api/chat", [&](const httplib::Request &req, httplib::Response &res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
+            res.set_header("Content-Type", "application/json");
+
+            // 写入临时输入文件
+            auto tmp_dir = std::filesystem::temp_directory_path();
+            std::string ts = std::to_string(std::time(nullptr)) + "_" +
+                             std::to_string((uintptr_t)(&req) & 0xFFFF);
+            auto in_path  = tmp_dir / (std::string("mood_chat_in_")  + ts + ".json");
+            auto out_path = tmp_dir / (std::string("mood_chat_out_") + ts + ".json");
+
+            try {
+                std::ofstream ofs(in_path, std::ios::binary);
+                ofs.write(req.body.data(), static_cast<std::streamsize>(req.body.size()));
+                ofs.close();
+
+                // 调用 Python 脚本,stdout 重定向到 out_path
+                std::string cmd = "scripts\\.venv\\Scripts\\python.exe scripts\\llm_chat.py \"" +
+                                  in_path.string() + "\" > \"" + out_path.string() + "\"";
+                int rc = std::system(cmd.c_str());
+
+                std::ifstream ifs(out_path, std::ios::binary);
+                std::stringstream ss; ss << ifs.rdbuf();
+                std::string out = ss.str();
+
+                std::error_code ec;
+                std::filesystem::remove(in_path, ec);
+                std::filesystem::remove(out_path, ec);
+
+                if (out.empty()) {
+                    res.status = 500;
+                    res.set_content("{\"error\":\"empty LLM response\"}", "application/json");
+                    return;
+                }
+                if (rc != 0) {
+                    // Python 已经写了一个 error JSON 到 stdout,直接转发
+                    res.status = 502;
+                }
+                res.set_content(out, "application/json");
+            } catch (const std::exception &e) {
+                std::error_code ec;
+                std::filesystem::remove(in_path, ec);
+                std::filesystem::remove(out_path, ec);
+                res.status = 500;
+                json err; err["error"] = std::string("chat proxy failed: ") + e.what();
+                res.set_content(err.dump(), "application/json");
+            }
+        });
+
         // FS Browse
         svr.Get("/api/fs/browse", [&](const httplib::Request &req, httplib::Response &res) {
              if (is_read_only) {

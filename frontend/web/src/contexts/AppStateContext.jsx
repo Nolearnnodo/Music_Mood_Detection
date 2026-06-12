@@ -298,6 +298,41 @@ export function AppStateProvider({ children }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 聊天:LLM 返回 mood + target 后,等价于一次 handleEmotionGenerate
+  const handleChatRecommendation = useCallback(async (chatResult) => {
+    if (!chatResult?.mood || !chatResult?.target) return null;
+    const { mood, target } = chatResult;
+    // 把 mood.label 转换成内置 face emotion key,驱动主题
+    const cnToFace = {
+      '开心': 'happy', '快乐': 'happy', '兴奋': 'happy',
+      '平静': 'neutral', '专注': 'neutral', '放松': 'neutral',
+      '低落': 'sad', '伤心': 'sad', '难过': 'sad', '疲惫': 'sad',
+      '生气': 'angry', '愤怒': 'angry',
+      '焦虑': 'fearful', '紧张': 'fearful',
+      '惊讶': 'surprised'
+    };
+    const faceKey = cnToFace[mood.label] || 'neutral';
+    setManualEmotion({
+      label: faceKey,
+      confidence: mood.confidence || 0.8,
+      source: 'chat',
+      timestamp: Date.now()
+    });
+    await handleEmotionGenerate({
+      faceEmotion: { label: faceKey, confidence: mood.confidence || 0.8, source: 'chat' },
+      moodTarget: {
+        v: target.valence,
+        a: target.arousal,
+        radius: target.radius,
+        title: `聊天 · ${mood.label}`,
+        description: chatResult.reply
+      },
+      strategy: target.strategy || 'match'
+    });
+    return chatResult;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // 摄像头手势分发:
   //   swipe_right → 下一首
   //   swipe_left  → 上一首
@@ -342,6 +377,7 @@ export function AppStateProvider({ children }) {
     handlePlayerTrackChange, handleExportPreset, handlePlaylistExportFromPlayer,
     handleEmotionGenerate, handleEmotionPlay, handlePlaylistLow,
     handleHeadGesture, handleStableEmotionChange,
+    handleChatRecommendation,
     fetchTracks, refreshScanStatus: startSSE
   };
 
