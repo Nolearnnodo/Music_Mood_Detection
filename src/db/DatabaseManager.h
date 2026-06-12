@@ -47,6 +47,7 @@ public:
     }
 
     ~DatabaseManager() {
+        checkpoint_wal();
         sqlite3_close(db);
     }
 
@@ -282,6 +283,24 @@ public:
         sqlite3_exec(db, sql.c_str(), 0, 0, 0);
     }
 
+    int rewrite_path_prefix(const std::string &from_prefix, const std::string &to_prefix) {
+        if (from_prefix.empty() || from_prefix == to_prefix) return 0;
+
+        int changed = 0;
+        char *errMsg = nullptr;
+        sqlite3_exec(db, "BEGIN TRANSACTION;", 0, 0, &errMsg);
+
+        changed += rewrite_table_path_prefix("directories", "path", from_prefix, to_prefix);
+        changed += rewrite_table_path_prefix("tracks", "filepath", from_prefix, to_prefix);
+
+        sqlite3_exec(db, "COMMIT;", 0, 0, &errMsg);
+        return changed;
+    }
+
+    void checkpoint_wal() {
+        sqlite3_exec(db, "PRAGMA wal_checkpoint(FULL);", 0, 0, 0);
+    }
+
     std::vector<TrackBrief> get_all_finished_filtered(const std::vector<std::string> &available_paths) {
         std::vector<TrackBrief> list;
         if (available_paths.empty()) return list;
@@ -409,5 +428,67 @@ public:
         }
         sqlite3_finalize(stmt);
         return pending;
+    }
+
+private:
+    static bool has_path_prefix(const std::string &path, const std::string &prefix) {
+        if (path == prefix) return true;
+        if (path.size() <= prefix.size()) return false;
+        if (path.rfind(prefix, 0) != 0) return false;
+
+        char last = prefix.back();
+        if (last == '/' || last == '\\') return true;
+
+        char next = path[prefix.size()];
+        return next == '/' || next == '\\';
+    }
+
+    static std::string join_rewritten_path(const std::string &path,
+                                           const std::string &from_prefix,
+                                           const std::string &to_prefix) {
+        std::string rest = path.substr(from_prefix.size());
+        if (!rest.empty() && (rest[0] == '/' || rest[0] == '\\') && !to_prefix.empty()) {
+            char last = to_prefix.back();
+            if (last == '/' || last == '\\') {
+                rest.erase(rest.begin());
+            }
+        }
+        return to_prefix + rest;
+    }
+
+    int rewrite_table_path_prefix(const std::string &table,
+                                  const std::string &column,
+                                  const std::string &from_prefix,
+                                  const std::string &to_prefix) {
+        std::vector<std::pair<int, std::string> > updates;
+        std::string select_sql = "SELECT id, " + column + " FROM " + table;
+
+        sqlite3_stmt *stmt;
+        sqlite3_prepare_v2(db, select_sql.c_str(), -1, &stmt, 0);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            int id = sqlite3_column_int(stmt, 0);
+            const char *path_txt = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1));
+            if (!path_txt) continue;
+
+            std::string old_path(path_txt);
+            if (has_path_prefix(old_path, from_prefix)) {
+                updates.emplace_back(id, join_rewritten_path(old_path, from_prefix, to_prefix));
+            }
+        }
+        sqlite3_finalize(stmt);
+
+        if (updates.empty()) return 0;
+
+        std::string update_sql = "UPDATE " + table + " SET " + column + "=? WHERE id=?";
+        sqlite3_prepare_v2(db, update_sql.c_str(), -1, &stmt, 0);
+        for (const auto &item: updates) {
+            sqlite3_bind_text(stmt, 1, item.second.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int(stmt, 2, item.first);
+            sqlite3_step(stmt);
+            sqlite3_reset(stmt);
+            sqlite3_clear_bindings(stmt);
+        }
+        sqlite3_finalize(stmt);
+        return (int) updates.size();
     }
 };

@@ -13,10 +13,14 @@ void print_help(const char *prog_name) {
             << "  --port <port>     Listen port (default: 8080)\n"
             << "  --vk-index <idx>  Vulkan device index (default: 0)\n"
             << "  --no-vulkan       Disable Vulkan GPU acceleration\n"
+            << "  --no-analysis     Skip AI model loading and scanning; use existing DB only\n"
             << "  --read-only       Disable folder modification APIs\n"
             << "  --api-only        Start API server without serving built frontend files\n"
             << "  --web-root <dir>  Static frontend directory (default: ./web)\n"
             << "  --model-dir <dir> AI model directory (default: ./models)\n"
+            << "  --db-path <file>  SQLite database path (default: music_mood.db)\n"
+            << "  --path-map <from> <to>\n"
+            << "                    Rewrite stored cloud path prefix to local path prefix before serving\n"
             << "  --help            Show this help\n";
 }
 
@@ -31,6 +35,8 @@ int main(int argc, char *argv[]) {
     bool use_vulkan = true;
     bool read_only = false;
     bool api_only = false;
+    bool analysis_enabled = true;
+    std::vector<std::pair<std::string, std::string> > path_maps;
 
     // 简单的参数解析
     for (int i = 1; i < argc; ++i) {
@@ -43,6 +49,8 @@ int main(int argc, char *argv[]) {
             vk_device_index = std::stoi(argv[++i]);
         } else if (arg == "--no-vulkan") {
             use_vulkan = false;
+        } else if (arg == "--no-analysis") {
+            analysis_enabled = false;
         } else if (arg == "--read-only") {
             read_only = true;
         } else if (arg == "--api-only") {
@@ -51,6 +59,10 @@ int main(int argc, char *argv[]) {
             web_root = argv[++i];
         } else if (arg == "--model-dir" && i + 1 < argc) {
             model_dir = argv[++i];
+        } else if (arg == "--db-path" && i + 1 < argc) {
+            db_path = argv[++i];
+        } else if (arg == "--path-map" && i + 2 < argc) {
+            path_maps.emplace_back(argv[++i], argv[++i]);
         } else if (arg == "--help") {
             print_help(argv[0]);
             return 0;
@@ -65,8 +77,10 @@ int main(int argc, char *argv[]) {
             << "Host: " << host << "\n"
             << "Port: " << port << "\n"
             << "Vulkan: " << (use_vulkan ? "Enabled" : "Disabled") << "\n"
+            << "Analysis: " << (analysis_enabled ? "Enabled" : "Disabled") << "\n"
             << "Read-Only: " << (read_only ? "Yes" : "No") << "\n";
     std::cout << "API Only: " << (api_only ? "Yes" : "No") << "\n"
+            << "DB Path: " << db_path << "\n"
             << "Model Dir: " << model_dir << "\n";
     if (!api_only) {
         std::cout << "Web Root: " << web_root << "\n";
@@ -80,9 +94,24 @@ int main(int argc, char *argv[]) {
     std::cout << "Initializing Database..." << std::endl;
     DatabaseManager db(db_path);
 
-    // 2. 初始化 AI 模型
-    std::cout << "Loading AI Models from " << model_dir << "..." << std::endl;
     try {
+        for (const auto &mapping: path_maps) {
+            int changed = db.rewrite_path_prefix(mapping.first, mapping.second);
+            std::cout << "[DB] Rewrote " << changed << " path entries from \""
+                    << mapping.first << "\" to \"" << mapping.second << "\"." << std::endl;
+        }
+        if (!path_maps.empty()) {
+            db.checkpoint_wal();
+        }
+
+        if (!analysis_enabled) {
+            WebServer server(db, nullptr, web_root, host, port, true, !api_only);
+            return 0;
+        }
+
+        // 2. 初始化 AI 模型
+        std::cout << "Loading AI Models from " << model_dir << "..." << std::endl;
+
         // 传入 Vulkan 配置
         EmotionPredictor predictor(model_dir, use_vulkan, vk_device_index);
 
@@ -91,7 +120,7 @@ int main(int argc, char *argv[]) {
 
         // 4. 启动 Web 服务器 (阻塞运行)
         // 传入 host 和 port, read_only
-        WebServer server(db, scanner, web_root, host, port, read_only, !api_only);
+        WebServer server(db, &scanner, web_root, host, port, read_only, !api_only);
     } catch (const std::exception &e) {
         std::cerr << "Fatal Error: " << e.what() << std::endl;
         return -1;

@@ -15,6 +15,7 @@
 #include <thread>
 #include <algorithm>
 #include <climits>
+#include <memory>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -27,7 +28,7 @@ using json = nlohmann::json;
 class WebServer {
     httplib::Server svr;
     DatabaseManager &db;
-    LibraryScanner &scanner;
+    LibraryScanner *scanner;
     std::string web_root;
     bool is_read_only;
     bool serve_static_files;
@@ -38,9 +39,9 @@ class WebServer {
     std::vector<std::string> active_directories;
 
 public:
-    WebServer(DatabaseManager &_db, LibraryScanner &_sc, const std::string &_web_root,
+    WebServer(DatabaseManager &_db, LibraryScanner *_sc, const std::string &_web_root,
               const std::string &host, int port, bool read_only, bool serve_static = true)
-        : db(_db), scanner(_sc), web_root(_web_root), is_read_only(read_only),
+        : db(_db), scanner(_sc), web_root(_web_root), is_read_only(read_only || _sc == nullptr),
           serve_static_files(serve_static) {
 
         auto dirs = db.get_directories();
@@ -64,21 +65,25 @@ public:
             std::cout << "[Init] No active directories found. Skipping prune." << std::endl;
         }
 
-        scanner.start_workers(3);
-        scanner.resume_scans();
+        if (scanner) {
+            scanner->start_workers(3);
+            scanner->resume_scans();
 
-        scanner.set_event_callback([this](const std::string &msg) {
-            std::lock_guard<std::mutex> lock(sse_mtx);
-            auto it = sse_clients.begin();
-            while (it != sse_clients.end()) {
-                bool ok = (*it)->write(msg.c_str(), msg.size());
-                if (!ok) {
-                    it = sse_clients.erase(it);
-                } else {
-                    ++it;
+            scanner->set_event_callback([this](const std::string &msg) {
+                std::lock_guard<std::mutex> lock(sse_mtx);
+                auto it = sse_clients.begin();
+                while (it != sse_clients.end()) {
+                    bool ok = (*it)->write(msg.c_str(), msg.size());
+                    if (!ok) {
+                        it = sse_clients.erase(it);
+                    } else {
+                        ++it;
+                    }
                 }
-            }
-        });
+            });
+        } else {
+            std::cout << "[Init] Analysis disabled. Running with existing database only." << std::endl;
+        }
 
         setup_routes();
 
@@ -137,7 +142,12 @@ private:
             try {
                 auto j = json::parse(req.body);
                 std::string path = j["path"];
-                scanner.add_folder_async(path);
+                if (!scanner) {
+                    res.status = 403;
+                    res.set_content("{\"error\":\"Analysis disabled\"}", "application/json");
+                    return;
+                }
+                scanner->add_folder_async(path);
 
                 bool exists = false;
                 for(const auto& d : active_directories) if(d == path) exists = true;
