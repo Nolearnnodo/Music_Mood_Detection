@@ -7,11 +7,13 @@ cmake-build-*/
 # Dependencies
 node_modules/
 **/node_modules/
+**/.venv/
 
 # Runtime database
 *.db
 *.db-shm
 *.db-wal
+*.db.bak
 
 # Logs
 *.log
