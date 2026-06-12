@@ -35,6 +35,10 @@ function SettingsPage() {
     setLlmSavedAt(Date.now());
   };
 
+  // 推荐排除最近 N 分钟内播放过的歌
+  const excludeMin = appSettings.excludeRecentMin ?? 60;
+  const setExcludeMin = (v) => handleSaveSettings({ ...appSettings, excludeRecentMin: v });
+
   // 进入页面时同步一次 reanalyze 状态(可能其他页面已经触发了)
   useEffect(() => {
     axios.get('/api/music/reanalyze/status')
@@ -125,6 +129,28 @@ function SettingsPage() {
         {reanalyzeMsg && (
           <div className="text-xs text-slate-500 dark:text-slate-400">{reanalyzeMsg}</div>
         )}
+      </div>
+
+      <div className="glass border border-mood-border rounded-xl p-4 flex flex-col gap-3">
+        <div className="flex items-center gap-2 text-sm font-bold text-mood-text">
+          <RefreshCw size={14} className="text-mood-accent transition-colors duration-500"/> 推荐偏好
+        </div>
+        <label className="text-xs flex flex-col gap-2">
+          <div className="flex items-center justify-between text-mood-text">
+            <span>排除最近 <strong>{excludeMin}</strong> 分钟内播放过的歌</span>
+            <span className="font-mono text-[10px] text-slate-500">{excludeMin === 0 ? '不排除' : `${excludeMin} 分钟`}</span>
+          </div>
+          <input
+            type="range"
+            min={0} max={240} step={15}
+            value={excludeMin}
+            onChange={e => setExcludeMin(parseInt(e.target.value, 10))}
+            className="w-full accent-mood-accent"
+          />
+        </label>
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+          也会自动排除你标记为「不喜欢」的曲目。如果库内歌太少导致圈不到歌,系统会自动放宽并再次尝试。
+        </p>
       </div>
 
       <div className="glass border border-mood-border rounded-xl p-4 flex flex-col gap-3">

@@ -5,7 +5,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, AlertCircle, Clock, Download,
   List, ListMusic, Music, Pause,
-  Play, Repeat, SkipBack, SkipForward, Volume2, VolumeX
+  Play, Repeat, SkipBack, SkipForward, ThumbsDown, ThumbsUp,
+  Volume2, VolumeX
 } from 'lucide-react';
 
 import 'react-h5-audio-player/lib/styles.css';
@@ -224,6 +225,14 @@ function Player({
   };
 
   const handleEnded = () => {
+    const finished = playlist[currentIndex];
+    if (finished?.id) {
+      axios.post('/api/play_history', {
+        track_id: finished.id,
+        source: 'player',
+        played_pct: 1.0
+      }).catch(() => {});
+    }
     if (currentIndex < playlist.length - 1) {
       setCurrentIndex(prev => prev + 1);
     } else if (autoRefresh && typeof onPlaylistLow === 'function') {
@@ -243,6 +252,29 @@ function Player({
 
   // 渲染时使用 fullTrackInfo，如果还没加载出来，降级使用 currentTrack
   const displayTrack = fullTrackInfo || currentTrack;
+
+  // 喜欢/不喜欢反馈
+  const [feedbackMap, setFeedbackMap] = useState({});
+  useEffect(() => {
+    axios.get('/api/feedback')
+      .then(res => setFeedbackMap(res.data || {}))
+      .catch(() => {});
+  }, []);
+  const currentFeedback = displayTrack?.id ? feedbackMap[displayTrack.id] : null;
+  const sendFeedback = async kind => {
+    if (!displayTrack?.id) return;
+    const tid = displayTrack.id;
+    const nextKind = currentFeedback === kind ? 'clear' : kind;
+    try {
+      await axios.post('/api/feedback', { track_id: tid, kind: nextKind });
+      setFeedbackMap(prev => {
+        const next = { ...prev };
+        if (nextKind === 'clear') delete next[tid];
+        else next[tid] = nextKind;
+        return next;
+      });
+    } catch {}
+  };
 
   if (!displayTrack) {
     return (
@@ -290,7 +322,33 @@ function Player({
           </span>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {/* like / dislike */}
+          <button
+            onClick={() => sendFeedback('like')}
+            title={currentFeedback === 'like' ? '取消喜欢' : '喜欢'}
+            aria-pressed={currentFeedback === 'like'}
+            className={`p-1 rounded transition-colors ${
+              currentFeedback === 'like'
+                ? 'text-mood-accent bg-mood-accent-soft'
+                : 'text-slate-400 hover:text-mood-accent hover:bg-mood-accent-soft'
+            }`}
+          >
+            <ThumbsUp size={12}/>
+          </button>
+          <button
+            onClick={() => sendFeedback('dislike')}
+            title={currentFeedback === 'dislike' ? '取消不喜欢' : '不喜欢'}
+            aria-pressed={currentFeedback === 'dislike'}
+            className={`p-1 rounded transition-colors ${
+              currentFeedback === 'dislike'
+                ? 'text-red-500 bg-red-500/10'
+                : 'text-slate-400 hover:text-red-500 hover:bg-red-500/10'
+            }`}
+          >
+            <ThumbsDown size={12}/>
+          </button>
+
           {playlist.length > 1 && (
             <span className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[9px] font-mono">
               <Clock size={10}/> {formatTotalDuration(totalDuration)}

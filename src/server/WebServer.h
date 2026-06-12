@@ -458,10 +458,25 @@ private:
                 // 如果有时长限制，我们先获取比较多的数量，然后在内存中截断
                 int query_limit = (max_duration_mins > 0) ? std::max(limit, 500) : limit;
 
-                // 1. 获取列表
-                auto tracks = db.get_playlist(v, a, r, query_limit);
+                // 0. 收集要排除的歌曲(最近播放 + 不喜欢)
+                std::vector<int> exclude_ids;
+                if (req.has_param("exclude_recent_min")) {
+                    int mins = std::stoi(req.get_param_value("exclude_recent_min"));
+                    if (mins > 0) {
+                        auto recent = db.get_recently_played(mins);
+                        exclude_ids.insert(exclude_ids.end(), recent.begin(), recent.end());
+                    }
+                }
+                if (!req.has_param("include_disliked") ||
+                    req.get_param_value("include_disliked") != "true") {
+                    auto disliked = db.get_disliked();
+                    exclude_ids.insert(exclude_ids.end(), disliked.begin(), disliked.end());
+                }
 
-                // 2. K-NN 重心回退机制
+                // 1. 获取列表
+                auto tracks = db.get_playlist(v, a, r, query_limit, exclude_ids);
+
+                // 2. K-NN 重心回退机制 (回退时不再排除,确保至少有歌)
                 if (tracks.empty()) {
                     auto neighbors = db.get_nearest_neighbors(v, a, 50);
                     if (!neighbors.empty()) {
@@ -472,7 +487,9 @@ private:
                         }
                         v = sum_v / neighbors.size();
                         a = sum_a / neighbors.size();
-                        tracks = db.get_playlist(v, a, r, query_limit);
+                        tracks = db.get_playlist(v, a, r, query_limit, exclude_ids);
+                        if (tracks.empty())
+                            tracks = db.get_playlist(v, a, r, query_limit);
                     }
                 }
 
@@ -759,6 +776,99 @@ private:
                 json err; err["error"] = std::string("chat proxy failed: ") + e.what();
                 res.set_content(err.dump(), "application/json");
             }
+        });
+
+        // =================================================================================
+        // Play history + feedback
+        // =================================================================================
+        svr.Post("/api/play_history", [&](const httplib::Request &req, httplib::Response &res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
+            try {
+                auto j = json::parse(req.body);
+                int track_id = j.value("track_id", 0);
+                std::string source = j.value("source", "");
+                float pct = j.value("played_pct", 0.0f);
+                if (track_id <= 0) { res.status = 400;
+                    res.set_content("{\"error\":\"missing track_id\"}", "application/json");
+                    return; }
+                db.log_play(track_id, source, pct);
+                res.set_content("{\"status\":\"ok\"}", "application/json");
+            } catch (...) { res.status = 400; }
+        });
+
+        svr.Post("/api/feedback", [&](const httplib::Request &req, httplib::Response &res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
+            try {
+                auto j = json::parse(req.body);
+                int track_id = j.value("track_id", 0);
+                std::string kind = j.value("kind", "");
+                if (track_id <= 0) { res.status = 400;
+                    res.set_content("{\"error\":\"missing track_id\"}", "application/json");
+                    return; }
+                if (kind == "clear") db.clear_feedback(track_id);
+                else if (kind == "like" || kind == "dislike") db.set_feedback(track_id, kind);
+                else { res.status = 400;
+                    res.set_content("{\"error\":\"invalid kind\"}", "application/json");
+                    return; }
+                res.set_content("{\"status\":\"ok\"}", "application/json");
+            } catch (...) { res.status = 400; }
+        });
+
+        svr.Get("/api/feedback", [&](const httplib::Request &, httplib::Response &res) {
+            auto all = db.get_all_feedback();
+            json j;
+            for (auto &[id, kind] : all) j[std::to_string(id)] = kind;
+            res.set_content(j.dump(), "application/json");
+        });
+
+        // =================================================================================
+        // Single-track delete + reanalyze
+        // =================================================================================
+        svr.Delete(R"(/api/music/(\d+))", [&](const httplib::Request &req, httplib::Response &res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
+            if (is_read_only) { res.status = 403;
+                res.set_content("{\"error\":\"Read-only\"}", "application/json"); return; }
+            int id = std::stoi(req.matches[1]);
+            bool also_file = req.has_param("delete_file") && req.get_param_value("delete_file") == "true";
+            std::string path_u8 = db.get_track_path(id);
+            db.delete_track(id);
+            if (also_file && !path_u8.empty()) {
+                try {
+                    std::error_code ec;
+                    std::filesystem::remove(Encoding::to_fs_path(path_u8), ec);
+                } catch (...) {}
+            }
+            json out; out["status"] = "ok"; out["deleted_file"] = also_file;
+            res.set_content(out.dump(), "application/json");
+        });
+
+        svr.Post(R"(/api/music/(\d+)/reanalyze)", [&](const httplib::Request &req, httplib::Response &res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
+            if (is_read_only) { res.status = 403;
+                res.set_content("{\"error\":\"Read-only\"}", "application/json"); return; }
+            int id = std::stoi(req.matches[1]);
+            db.reset_track_for_reanalysis(id);
+
+            bool expected = false;
+            if (!reanalyze_running.compare_exchange_strong(expected, true)) {
+                res.status = 409;
+                res.set_content("{\"error\":\"Reanalysis already running\"}", "application/json");
+                return;
+            }
+            std::thread([this]() {
+                std::string cmd = "scripts\\.venv\\Scripts\\python.exe "
+                                  "scripts\\analyze_all.py --apply --preproc cpp --only-pending";
+                std::cout << "[Reanalyze:single] $ " << cmd << std::endl;
+                std::system(cmd.c_str());
+                reanalyze_running.store(false);
+                auto [done, failed, total] = db.get_progress_stats();
+                std::string j = "{\"done\":" + std::to_string(done) +
+                                ",\"failed\":" + std::to_string(failed) +
+                                ",\"total\":" + std::to_string(total) +
+                                ",\"reanalyzed\":true}";
+                broadcast_event("progress", j);
+            }).detach();
+            res.set_content("{\"status\":\"started\"}", "application/json");
         });
 
         // FS Browse

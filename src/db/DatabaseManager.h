@@ -66,11 +66,136 @@ public:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 path TEXT UNIQUE
             );
+            CREATE TABLE IF NOT EXISTS play_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                track_id INTEGER NOT NULL,
+                played_at INTEGER NOT NULL,        -- unix epoch (秒)
+                played_pct REAL DEFAULT 0,         -- 0..1, 是否听完
+                source TEXT DEFAULT ''             -- chat / camera / manual / library / explore
+            );
+            CREATE INDEX IF NOT EXISTS idx_play_history_ts ON play_history(played_at);
+            CREATE INDEX IF NOT EXISTS idx_play_history_track ON play_history(track_id);
+
+            CREATE TABLE IF NOT EXISTS user_feedback (
+                track_id INTEGER PRIMARY KEY,      -- 每首歌只保留最新一次反馈
+                kind     TEXT NOT NULL,            -- 'like' / 'dislike'
+                ts       INTEGER NOT NULL
+            );
             CREATE INDEX IF NOT EXISTS idx_va ON tracks(valence, arousal);
         )";
         char *errMsg = 0;
         sqlite3_exec(db, sql, 0, 0, &errMsg);
         sqlite3_exec(db, "ALTER TABLE tracks ADD COLUMN trajectory_data BLOB;", 0, 0, 0);
+    }
+
+    // --- 播放历史 / 用户反馈 ---
+
+    void log_play(int track_id, const std::string &source, float played_pct) {
+        const char *sql = "INSERT INTO play_history (track_id, played_at, played_pct, source) "
+                          "VALUES (?, strftime('%s','now'), ?, ?)";
+        sqlite3_stmt *stmt;
+        sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        sqlite3_bind_int(stmt, 1, track_id);
+        sqlite3_bind_double(stmt, 2, played_pct);
+        sqlite3_bind_text(stmt, 3, source.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
+    std::vector<int> get_recently_played(int minutes) {
+        std::vector<int> ids;
+        const char *sql = "SELECT DISTINCT track_id FROM play_history "
+                          "WHERE played_at > strftime('%s','now') - ?";
+        sqlite3_stmt *stmt;
+        sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        sqlite3_bind_int(stmt, 1, minutes * 60);
+        while (sqlite3_step(stmt) == SQLITE_ROW) ids.push_back(sqlite3_column_int(stmt, 0));
+        sqlite3_finalize(stmt);
+        return ids;
+    }
+
+    void set_feedback(int track_id, const std::string &kind) {
+        const char *sql = "INSERT INTO user_feedback (track_id, kind, ts) VALUES (?, ?, strftime('%s','now')) "
+                          "ON CONFLICT(track_id) DO UPDATE SET kind=excluded.kind, ts=excluded.ts";
+        sqlite3_stmt *stmt;
+        sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        sqlite3_bind_int(stmt, 1, track_id);
+        sqlite3_bind_text(stmt, 2, kind.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
+    void clear_feedback(int track_id) {
+        const char *sql = "DELETE FROM user_feedback WHERE track_id = ?";
+        sqlite3_stmt *stmt;
+        sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        sqlite3_bind_int(stmt, 1, track_id);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
+    std::vector<int> get_disliked() {
+        std::vector<int> ids;
+        const char *sql = "SELECT track_id FROM user_feedback WHERE kind = 'dislike'";
+        sqlite3_stmt *stmt;
+        sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        while (sqlite3_step(stmt) == SQLITE_ROW) ids.push_back(sqlite3_column_int(stmt, 0));
+        sqlite3_finalize(stmt);
+        return ids;
+    }
+
+    // 返回 map<track_id, kind>,前端用于绘制按钮状态
+    std::vector<std::pair<int, std::string>> get_all_feedback() {
+        std::vector<std::pair<int, std::string>> out;
+        const char *sql = "SELECT track_id, kind FROM user_feedback";
+        sqlite3_stmt *stmt;
+        sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            int id = sqlite3_column_int(stmt, 0);
+            std::string kind = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1));
+            out.emplace_back(id, kind);
+        }
+        sqlite3_finalize(stmt);
+        return out;
+    }
+
+    void delete_track(int track_id) {
+        sqlite3_exec(db, "BEGIN TRANSACTION;", 0, 0, 0);
+        const char *sql1 = "DELETE FROM tracks WHERE id = ?";
+        sqlite3_stmt *s;
+        sqlite3_prepare_v2(db, sql1, -1, &s, 0);
+        sqlite3_bind_int(s, 1, track_id);
+        sqlite3_step(s); sqlite3_finalize(s);
+
+        sqlite3_prepare_v2(db, "DELETE FROM play_history WHERE track_id = ?", -1, &s, 0);
+        sqlite3_bind_int(s, 1, track_id);
+        sqlite3_step(s); sqlite3_finalize(s);
+
+        sqlite3_prepare_v2(db, "DELETE FROM user_feedback WHERE track_id = ?", -1, &s, 0);
+        sqlite3_bind_int(s, 1, track_id);
+        sqlite3_step(s); sqlite3_finalize(s);
+        sqlite3_exec(db, "COMMIT;", 0, 0, 0);
+    }
+
+    void reset_track_for_reanalysis(int track_id) {
+        const char *sql = "UPDATE tracks SET status = 0 WHERE id = ?";
+        sqlite3_stmt *stmt;
+        sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        sqlite3_bind_int(stmt, 1, track_id);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
+    std::string get_track_path(int track_id) {
+        const char *sql = "SELECT filepath FROM tracks WHERE id = ?";
+        sqlite3_stmt *stmt;
+        sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        sqlite3_bind_int(stmt, 1, track_id);
+        std::string out;
+        if (sqlite3_step(stmt) == SQLITE_ROW)
+            out = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
+        sqlite3_finalize(stmt);
+        return out;
     }
 
     // --- 目录管理 API ---
@@ -341,11 +466,22 @@ public:
         return list;
     }
 
-    std::vector<PlaylistTrack> get_playlist(float v, float a, float r, int limit = 50) {
+    std::vector<PlaylistTrack> get_playlist(float v, float a, float r, int limit = 50,
+                                            const std::vector<int> &exclude_ids = {}) {
         std::vector<PlaylistTrack> list;
-        std::string sql = "SELECT id, filepath, filename, valence, arousal, duration FROM tracks WHERE status=2 AND "
-                "((valence - ?) * (valence - ?) + (arousal - ?) * (arousal - ?)) <= ? "
-                "ORDER BY ((valence - ?) * (valence - ?) + (arousal - ?) * (arousal - ?)) ASC LIMIT ?";
+        std::string excl;
+        if (!exclude_ids.empty()) {
+            excl = " AND id NOT IN (";
+            for (size_t i = 0; i < exclude_ids.size(); ++i) {
+                if (i > 0) excl += ",";
+                excl += std::to_string(exclude_ids[i]);
+            }
+            excl += ")";
+        }
+        std::string sql = "SELECT id, filepath, filename, valence, arousal, duration FROM tracks "
+                          "WHERE status=2" + excl + " AND "
+                          "((valence - ?) * (valence - ?) + (arousal - ?) * (arousal - ?)) <= ? "
+                          "ORDER BY ((valence - ?) * (valence - ?) + (arousal - ?) * (arousal - ?)) ASC LIMIT ?";
         sqlite3_stmt *stmt;
         sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, 0);
         float r_sq = r * r;

@@ -39,7 +39,7 @@ export function AppStateProvider({ children }) {
 
   const [appSettings, setAppSettings] = useState(() => {
     const saved = localStorage.getItem('mood_settings');
-    const defaults = { limit: 50, durationLimit: 0, defaultRadius: 0.6, moodThemeEnabled: true };
+    const defaults = { limit: 50, durationLimit: 0, defaultRadius: 0.6, moodThemeEnabled: true, excludeRecentMin: 60 };
     return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
   });
   const [playlistRadius, setPlaylistRadius] = useState(appSettings.defaultRadius);
@@ -248,7 +248,8 @@ export function AppStateProvider({ children }) {
           a: moodTarget.a,
           r,
           format: 'json',
-          limit: appSettings.limit
+          limit: appSettings.limit,
+          exclude_recent_min: appSettings.excludeRecentMin ?? 60
         };
         if (appSettings.durationLimit > 0)
           params.duration_limit = appSettings.durationLimit;
