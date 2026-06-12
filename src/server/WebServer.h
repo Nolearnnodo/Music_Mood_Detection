@@ -14,7 +14,9 @@
 #include <mutex>
 #include <thread>
 #include <algorithm>
+#include <atomic>
 #include <climits>
+#include <cstdlib>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -37,6 +39,9 @@ class WebServer {
     std::set<httplib::DataSink *> sse_clients;
 
     std::vector<std::string> active_directories;
+
+    // Reanalyze (Python 子进程) 状态,避免并发
+    std::atomic<bool> reanalyze_running{false};
 
 public:
     WebServer(DatabaseManager &_db, LibraryScanner &_sc, const std::string &_web_root,
@@ -91,11 +96,37 @@ public:
         }
 
         scanner.start_workers(3);
-        scanner.resume_scans();
+        // 注:ncnn 推理路径目前会输出异常 V/A,默认不再自动恢复扫描或自动扫描 Music_Directory。
+        // 上传或 Music_Directory 中的文件改由 /api/music/reanalyze 调用 Python 脚本处理。
+        // scanner.resume_scans();
+        // if (!music_dir.empty() && !is_read_only) scanner.add_folder_async(music_dir);
 
-        // 启动后扫描 Music_Directory（识别用户手动放进去的歌曲）
+        // 启动时把 Music_Directory 里已有的歌登记进数据库 (status=0),供 reanalyze 使用
         if (!music_dir.empty() && !is_read_only) {
-            scanner.add_folder_async(music_dir);
+            std::thread([this]() {
+                try {
+                    std::filesystem::path root = Encoding::to_fs_path(music_dir);
+                    if (!std::filesystem::is_directory(root)) return;
+                    int n = 0;
+                    for (auto &entry : std::filesystem::recursive_directory_iterator(
+                             root, std::filesystem::directory_options::skip_permission_denied)) {
+                        if (!entry.is_regular_file()) continue;
+                        std::string ext = Encoding::to_utf8_string(entry.path().extension());
+                        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                        if (ext == ".mp3" || ext == ".wav" || ext == ".flac" ||
+                            ext == ".m4a" || ext == ".ogg" || ext == ".aac" ||
+                            ext == ".ape" || ext == ".wma" || ext == ".wv" || ext == ".aiff") {
+                            auto [id, is_new] = scanner.register_single_file(
+                                Encoding::to_utf8_string(entry.path()));
+                            if (is_new) n++;
+                        }
+                    }
+                    if (n > 0) std::cout << "[Init] Registered " << n
+                                         << " new files in Music_Directory (pending reanalyze)" << std::endl;
+                } catch (const std::exception &e) {
+                    std::cerr << "[Init] Music_Directory scan failed: " << e.what() << std::endl;
+                }
+            }).detach();
         }
 
         scanner.set_event_callback([this](const std::string &msg) {
@@ -124,6 +155,21 @@ public:
     }
 
 private:
+    void broadcast_event(const std::string &event, const std::string &data) {
+        std::string msg = "event: " + event + "\ndata: " + data + "\n\n";
+        std::lock_guard<std::mutex> lock(sse_mtx);
+        auto it = sse_clients.begin();
+        while (it != sse_clients.end()) {
+            if (!(*it)->write(msg.c_str(), msg.size())) it = sse_clients.erase(it);
+            else ++it;
+        }
+    }
+
+    void broadcast_status(const std::string &text) {
+        json j; j["msg"] = text;
+        broadcast_event("status", j.dump());
+    }
+
     void setup_routes() {
         if (serve_static_files) {
             if (!svr.set_mount_point("/", web_root)) {
@@ -578,16 +624,16 @@ private:
                     ofs.write(f.content.data(), static_cast<std::streamsize>(f.content.size()));
                     ofs.close();
 
-                    // 5. 入队分析
+                    // 5. 仅登记,不入 ncnn 队列。后续由 /api/music/reanalyze 调用 Python 分析
                     std::string saved_u8 = Encoding::to_utf8_string(final_path);
-                    auto [tid, queued] = scanner.enqueue_single_file(saved_u8);
+                    auto [tid, registered] = scanner.register_single_file(saved_u8);
 
                     item["status"] = "ok";
                     item["track_id"] = tid;
                     item["filename"] = Encoding::to_utf8_string(final_path.filename());
                     item["relative_path"] = std::string("Music_Directory/") +
                                             Encoding::to_utf8_string(final_path.filename());
-                    item["queued"] = queued;
+                    item["registered"] = registered;
                     result_arr.push_back(item);
                     uploaded++;
                 }
@@ -603,6 +649,57 @@ private:
                 err["error"] = std::string("Upload failed: ") + e.what();
                 res.set_content(err.dump(), "application/json");
             }
+        });
+
+        // =================================================================================
+        // Reanalyze API (spawns Python scripts/analyze_all.py)
+        // =================================================================================
+        svr.Post("/api/music/reanalyze", [&](const httplib::Request &req, httplib::Response &res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
+            if (is_read_only) {
+                res.status = 403;
+                res.set_content("{\"error\":\"Read-only mode\"}", "application/json");
+                return;
+            }
+            bool expected = false;
+            if (!reanalyze_running.compare_exchange_strong(expected, true)) {
+                res.status = 409;
+                res.set_content("{\"error\":\"Reanalysis already running\"}", "application/json");
+                return;
+            }
+
+            bool full = req.has_param("full") && req.get_param_value("full") == "true";
+
+            std::thread([this, full]() {
+                // 假设可执行文件 CWD = 项目根目录
+                std::string cmd = "scripts\\.venv\\Scripts\\python.exe "
+                                  "scripts\\analyze_all.py --apply --preproc cpp";
+                if (!full) cmd += " --only-pending";
+
+                std::cout << "[Reanalyze] $ " << cmd << std::endl;
+                broadcast_status("Reanalyzing tracks...");
+                int rc = std::system(cmd.c_str());
+                std::cout << "[Reanalyze] exit=" << rc << std::endl;
+
+                // 完成后广播一次进度,让前端刷新
+                auto [done, failed, total] = db.get_progress_stats();
+                std::string j = "{\"done\":" + std::to_string(done) +
+                                ",\"failed\":" + std::to_string(failed) +
+                                ",\"total\":" + std::to_string(total) +
+                                ",\"percentage\":" +
+                                std::to_string(total > 0 ? (float)(done + failed) / total * 100.0 : 0.0) +
+                                ",\"reanalyzed\":true}";
+                broadcast_event("progress", j);
+                reanalyze_running.store(false);
+            }).detach();
+
+            res.set_content("{\"status\":\"started\"}", "application/json");
+        });
+
+        svr.Get("/api/music/reanalyze/status", [&](const httplib::Request &, httplib::Response &res) {
+            json j;
+            j["running"] = reanalyze_running.load();
+            res.set_content(j.dump(), "application/json");
         });
 
         // FS Browse

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertCircle, CheckCircle2, FolderOpen, Loader2, Upload } from 'lucide-react';
 
@@ -19,6 +19,28 @@ function UploadPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [items, setItems] = useState([]); // { name, status: pending|uploading|done|error, msg }
   const [busy, setBusy] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeMsg, setAnalyzeMsg] = useState('');
+
+  // 分析进行中时,每 2s 轮询一次状态;完成后刷新 tracks
+  useEffect(() => {
+    if (!analyzing) return;
+    let cancelled = false;
+    const timer = setInterval(async () => {
+      try {
+        const res = await axios.get('/api/music/reanalyze/status');
+        if (cancelled) return;
+        if (!res.data?.running) {
+          setAnalyzing(false);
+          setAnalyzeMsg('分析完成,已写入数据库');
+          await fetchTracks();
+        }
+      } catch {
+        // 忽略,下次再试
+      }
+    }, 2000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [analyzing, fetchTracks]);
 
   const addFiles = files => {
     const next = [];
@@ -63,7 +85,7 @@ function UploadPage() {
         setItems(prev => prev.map(it => it === item ? {
           ...it,
           status: 'done',
-          msg: res.data?.relative_path || '已加入分析队列'
+          msg: res.data?.relative_path || '已上传'
         } : it));
       } catch (e) {
         const msg = e.response?.data?.error || e.message || '上传失败';
@@ -72,8 +94,29 @@ function UploadPage() {
     }
 
     setBusy(false);
-    await fetchTracks();
-    refreshScanStatus();
+
+    // 上传完触发 Python 重新分析(只处理 pending 状态)
+    const uploadedOk = items.some(i => i.status === 'done') ||
+                       queue.some(_ => true); // 至少尝试过一次上传
+    if (uploadedOk) {
+      try {
+        setAnalyzing(true);
+        setAnalyzeMsg('正在分析新上传的曲目,数秒后完成...');
+        await axios.post('/api/music/reanalyze');
+        // SSE 收到 reanalyzed:true 后会自己关掉 analyzing
+        refreshScanStatus();
+      } catch (e) {
+        if (e.response?.status === 409) {
+          setAnalyzeMsg('已有分析在进行中,等它跑完即可');
+        } else {
+          setAnalyzing(false);
+          setAnalyzeMsg(`分析触发失败:${e.response?.data?.error || e.message}`);
+        }
+      }
+    } else {
+      await fetchTracks();
+      refreshScanStatus();
+    }
   };
 
   const handleClear = () => setItems([]);
@@ -88,9 +131,21 @@ function UploadPage() {
           <h1 className="text-lg font-bold text-mood-text">上传音乐</h1>
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          上传后会保存到项目内 <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">Music_Directory/</code>，并自动加入分析队列。
+          上传后会保存到项目内 <code className="bg-slate-200 dark:bg-slate-700 px-1 rounded">Music_Directory/</code>，并自动调用 Python 离线分析器。
         </p>
       </div>
+
+      {(analyzing || analyzeMsg) && (
+        <div className={`rounded-xl border p-3 flex items-center gap-3 text-sm ${
+          analyzing
+            ? 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-300'
+            : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+        }`}>
+          {analyzing && <Loader2 size={16} className="animate-spin shrink-0"/>}
+          {!analyzing && <CheckCircle2 size={16} className="shrink-0"/>}
+          <span>{analyzeMsg}</span>
+        </div>
+      )}
 
       <div
         onDragOver={e => { e.preventDefault(); setIsDragging(true); }}

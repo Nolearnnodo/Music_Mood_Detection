@@ -142,6 +142,14 @@ public:
         return {id, is_new};
     }
 
+    // 仅把文件登记进数据库 (status=0),不入 ncnn 队列。
+    // 用于由外部分析器 (例如 scripts/analyze_all.py) 接管推理的场景。
+    std::pair<int, bool> register_single_file(const std::string &utf8_file_path) {
+        auto [id, is_new] = db.add_or_get_track(utf8_file_path);
+        if (is_new) broadcast_progress();
+        return {id, is_new};
+    }
+
     void add_folder_async(const std::string &utf8_folder_path) {
         // 复制一份 path 避免 lambda 引用失效
         std::string folder_path_copy = utf8_folder_path;

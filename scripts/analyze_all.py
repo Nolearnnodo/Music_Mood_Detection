@@ -90,55 +90,72 @@ def main():
     ap.add_argument("--preproc", default="cpp",
                     choices=["cpp", "log10", "power_to_db"])
     ap.add_argument("--limit", type=int, default=0, help="只处理前 N 首")
+    ap.add_argument("--only-pending", action="store_true",
+                    help="只分析 status != 2 的曲目(新上传未分析)")
     args = ap.parse_args()
 
     con = sqlite3.connect(DB_PATH)
+    if args.only_pending:
+        where = "status IN (0, 1)"
+    else:
+        where = "status=2"
     rows = list(con.execute(
-        "SELECT id, filepath, filename FROM tracks WHERE status=2 ORDER BY id"
+        f"SELECT id, filepath, filename FROM tracks WHERE {where} ORDER BY id"
     ))
     if args.limit:
         rows = rows[:args.limit]
 
-    print(f"准备分析 {len(rows)} 首歌,preproc={args.preproc},apply={args.apply}\n")
+    print(f"准备分析 {len(rows)} 首歌,preproc={args.preproc},apply={args.apply}", flush=True)
+    if args.only_pending:
+        print("(模式:仅 pending)", flush=True)
+    print("", flush=True)
     t0 = time.time()
-    new_vals = []
+    processed = 0
+    skipped = 0
+    failed = 0
+    vs_acc, as_acc = [], []
 
     for i, (tid, path, name) in enumerate(rows, 1):
         try:
             result = analyze(path, args.preproc)
         except Exception as e:
-            print(f"  [{i}/{len(rows)}] #{tid} {name[:35]} ERROR {e}")
+            print(f"  [{i}/{len(rows)}] #{tid} {name[:35]} ERROR {e}", flush=True)
+            if args.apply:
+                with con:
+                    con.execute("UPDATE tracks SET status=-1 WHERE id=?", (tid,))
+            failed += 1
             continue
         if not result:
-            print(f"  [{i}/{len(rows)}] #{tid} {name[:35]} SKIP (too short)")
+            print(f"  [{i}/{len(rows)}] #{tid} {name[:35]} SKIP (too short)", flush=True)
+            skipped += 1
             continue
         gv, ga, dur, traj = result
-        new_vals.append((tid, gv, ga, dur, traj))
-        print(f"  [{i}/{len(rows)}] #{tid} V={gv:5.2f} A={ga:5.2f} dur={dur:6.1f}s {name[:40]}")
+        vs_acc.append(gv)
+        as_acc.append(ga)
+        print(f"  [{i}/{len(rows)}] #{tid} V={gv:5.2f} A={ga:5.2f} dur={dur:6.1f}s {name[:40]}",
+              flush=True)
+        if args.apply:
+            with con:
+                con.execute(
+                    "UPDATE tracks SET valence=?, arousal=?, duration=?, "
+                    "trajectory_data=?, status=2 WHERE id=?",
+                    (float(gv), float(ga), float(dur),
+                     serialize_trajectory(traj), tid)
+                )
+        processed += 1
 
     elapsed = time.time() - t0
-    print(f"\n分析完成,耗时 {elapsed:.1f}s,得到 {len(new_vals)} 条结果")
+    print(f"\n分析完成,耗时 {elapsed:.1f}s。processed={processed} skipped={skipped} failed={failed}",
+          flush=True)
 
-    if not new_vals:
-        return
-
-    vs = np.array([r[1] for r in new_vals])
-    as_ = np.array([r[2] for r in new_vals])
-    print(f"  V: min={vs.min():.2f} max={vs.max():.2f} mean={vs.mean():.2f} std={vs.std():.2f}")
-    print(f"  A: min={as_.min():.2f} max={as_.max():.2f} mean={as_.mean():.2f} std={as_.std():.2f}")
-
+    if vs_acc:
+        vs = np.array(vs_acc); as_ = np.array(as_acc)
+        print(f"  V: min={vs.min():.2f} max={vs.max():.2f} mean={vs.mean():.2f} std={vs.std():.2f}",
+              flush=True)
+        print(f"  A: min={as_.min():.2f} max={as_.max():.2f} mean={as_.mean():.2f} std={as_.std():.2f}",
+              flush=True)
     if not args.apply:
-        print("\n[dry-run] 加 --apply 才写库")
-        return
-
-    print("\n写入数据库 ...")
-    with con:
-        for tid, gv, ga, dur, traj in new_vals:
-            con.execute(
-                "UPDATE tracks SET valence=?, arousal=?, duration=?, trajectory_data=? WHERE id=?",
-                (float(gv), float(ga), float(dur), serialize_trajectory(traj), tid)
-            )
-    print("完成。")
+        print("\n[dry-run] 加 --apply 才写库", flush=True)
 
 
 if __name__ == "__main__":
