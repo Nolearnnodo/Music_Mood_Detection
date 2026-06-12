@@ -250,7 +250,8 @@ export function AppStateProvider({ children }) {
           r,
           format: 'json',
           limit: appSettings.limit,
-          exclude_recent_min: appSettings.excludeRecentMin ?? 60
+          exclude_recent_min: appSettings.excludeRecentMin ?? 60,
+          debug_score: true
         };
         if (appSettings.durationLimit > 0)
           params.duration_limit = appSettings.durationLimit;

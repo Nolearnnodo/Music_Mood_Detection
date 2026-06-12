@@ -458,7 +458,9 @@ private:
                 // 如果有时长限制，我们先获取比较多的数量，然后在内存中截断
                 int query_limit = (max_duration_mins > 0) ? std::max(limit, 500) : limit;
 
-                // 0. 收集要排除的歌曲(最近播放 + 不喜欢)
+                // 0. 收集要硬排除的歌曲。
+                //    v2 推荐里 dislike 已在 SQL 内过滤,但若用户显式设了 exclude_recent_min
+                //    且 >0,仍然做硬排除(用户偏好压过软惩罚)。
                 std::vector<int> exclude_ids;
                 if (req.has_param("exclude_recent_min")) {
                     int mins = std::stoi(req.get_param_value("exclude_recent_min"));
@@ -467,29 +469,52 @@ private:
                         exclude_ids.insert(exclude_ids.end(), recent.begin(), recent.end());
                     }
                 }
-                if (!req.has_param("include_disliked") ||
-                    req.get_param_value("include_disliked") != "true") {
-                    auto disliked = db.get_disliked();
-                    exclude_ids.insert(exclude_ids.end(), disliked.begin(), disliked.end());
-                }
 
-                // 1. 获取列表
-                auto tracks = db.get_playlist(v, a, r, query_limit, exclude_ids);
+                // v1 = 旧版距离单一目标;v2 = 综合排序(距离+喜欢+新鲜度)
+                bool use_v2 = !req.has_param("rank") ||
+                              req.get_param_value("rank") != "v1";
+                bool want_score = req.has_param("debug_score") &&
+                                  req.get_param_value("debug_score") == "true";
 
-                // 2. K-NN 重心回退机制 (回退时不再排除,确保至少有歌)
-                if (tracks.empty()) {
-                    auto neighbors = db.get_nearest_neighbors(v, a, 50);
-                    if (!neighbors.empty()) {
-                        float sum_v = 0, sum_a = 0;
-                        for(const auto& n : neighbors) {
-                            sum_v += n.v;
-                            sum_a += n.a;
+                std::vector<PlaylistTrack> tracks;
+                std::vector<DatabaseManager::RankedTrack> ranked_full;
+
+                if (use_v2) {
+                    ranked_full = db.get_playlist_ranked(v, a, r, query_limit, exclude_ids);
+                    if (ranked_full.empty()) {
+                        // KNN 重心回退
+                        auto neighbors = db.get_nearest_neighbors(v, a, 50);
+                        if (!neighbors.empty()) {
+                            float sum_v = 0, sum_a = 0;
+                            for (const auto &n : neighbors) { sum_v += n.v; sum_a += n.a; }
+                            v = sum_v / neighbors.size();
+                            a = sum_a / neighbors.size();
+                            ranked_full = db.get_playlist_ranked(v, a, r, query_limit, exclude_ids);
+                            if (ranked_full.empty()) {
+                                ranked_full = db.get_playlist_ranked(v, a, r, query_limit);
+                            }
                         }
-                        v = sum_v / neighbors.size();
-                        a = sum_a / neighbors.size();
-                        tracks = db.get_playlist(v, a, r, query_limit, exclude_ids);
-                        if (tracks.empty())
-                            tracks = db.get_playlist(v, a, r, query_limit);
+                    }
+                    for (auto &rt : ranked_full) tracks.push_back(rt.track);
+                } else {
+                    // 旧路径
+                    if (!req.has_param("include_disliked") ||
+                        req.get_param_value("include_disliked") != "true") {
+                        auto disliked = db.get_disliked();
+                        exclude_ids.insert(exclude_ids.end(), disliked.begin(), disliked.end());
+                    }
+                    tracks = db.get_playlist(v, a, r, query_limit, exclude_ids);
+                    if (tracks.empty()) {
+                        auto neighbors = db.get_nearest_neighbors(v, a, 50);
+                        if (!neighbors.empty()) {
+                            float sum_v = 0, sum_a = 0;
+                            for(const auto& n : neighbors) { sum_v += n.v; sum_a += n.a; }
+                            v = sum_v / neighbors.size();
+                            a = sum_a / neighbors.size();
+                            tracks = db.get_playlist(v, a, r, query_limit, exclude_ids);
+                            if (tracks.empty())
+                                tracks = db.get_playlist(v, a, r, query_limit);
+                        }
                     }
                 }
 
@@ -516,11 +541,27 @@ private:
 
                 if (format == "json") {
                     json j = json::array();
-                    for (const auto &t: tracks)
-                        j.push_back({
-                            {"id", t.id}, {"title", t.title}, {"v", t.v}, {"a", t.a},
-                            {"path", t.filepath}, {"duration", t.duration}
-                        });
+                    if (use_v2 && want_score && !ranked_full.empty() && tracks.size() <= ranked_full.size()) {
+                        for (size_t i = 0; i < tracks.size(); ++i) {
+                            const auto &rt = ranked_full[i];
+                            const auto &t  = tracks[i];
+                            int now_ts = (int) std::time(nullptr);
+                            int mins_ago = rt.last_played > 0 ? (now_ts - rt.last_played) / 60 : -1;
+                            j.push_back({
+                                {"id", t.id}, {"title", t.title}, {"v", t.v}, {"a", t.a},
+                                {"path", t.filepath}, {"duration", t.duration},
+                                {"score", rt.score}, {"dist", rt.dist},
+                                {"feedback", rt.fb},
+                                {"last_played_min_ago", mins_ago}
+                            });
+                        }
+                    } else {
+                        for (const auto &t: tracks)
+                            j.push_back({
+                                {"id", t.id}, {"title", t.title}, {"v", t.v}, {"a", t.a},
+                                {"path", t.filepath}, {"duration", t.duration}
+                            });
+                    }
                     res.set_content(j.dump(), "application/json");
                     return;
                 }

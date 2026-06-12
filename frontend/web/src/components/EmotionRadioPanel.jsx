@@ -158,18 +158,34 @@ function EmotionRadioPanel({
               <Play size={12}/> 播放
             </button>
           </div>
-          <div className="max-h-28 overflow-y-auto custom-scrollbar rounded-lg border border-mood-border bg-slate-50 dark:bg-slate-900/40">
-            {playlist.slice(0, 6).map((track, idx) => (
-              <button
-                key={`${track.id}-${idx}`}
-                onClick={() => onPlay?.(idx)}
-                className="w-full text-left px-3 py-2 text-[11px] border-b last:border-b-0 border-mood-border hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                title={track.title || track.filepath}
-              >
-                <span className="font-mono opacity-60 mr-1">{idx + 1}.</span>
-                <span className="text-mood-text">{track.title || track.filepath}</span>
-              </button>
-            ))}
+          <div className="max-h-32 overflow-y-auto custom-scrollbar rounded-lg border border-mood-border bg-slate-50 dark:bg-slate-900/40">
+            {playlist.slice(0, 6).map((track, idx) => {
+              const isFresh = track.last_played_min_ago === -1;
+              const recent = track.last_played_min_ago >= 0 && track.last_played_min_ago < 720; // 12h
+              const liked = track.feedback === 'like';
+              return (
+                <button
+                  key={`${track.id}-${idx}`}
+                  onClick={() => onPlay?.(idx)}
+                  className="w-full text-left px-3 py-2 text-[11px] border-b last:border-b-0 border-mood-border hover:bg-mood-accent-soft transition-colors flex items-center gap-1"
+                  title={`${track.title || track.filepath}${
+                    track.dist !== undefined ? ` · 距离 ${track.dist.toFixed(2)} · score ${track.score?.toFixed(2)}` : ''
+                  }`}
+                >
+                  <span className="font-mono opacity-60 mr-1 shrink-0">{idx + 1}.</span>
+                  <span className="flex-1 truncate text-mood-text">{track.title || track.filepath}</span>
+                  {liked && (
+                    <span className="text-[9px] px-1 py-0.5 rounded bg-mood-accent-soft text-mood-accent shrink-0">👍</span>
+                  )}
+                  {isFresh && (
+                    <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/10 text-emerald-500 shrink-0">新鲜</span>
+                  )}
+                  {recent && (
+                    <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-500 shrink-0">最近</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

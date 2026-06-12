@@ -509,6 +509,99 @@ public:
         return list;
     }
 
+    // V2 推荐:多目标加权排序
+    //   - 情绪距离(平方)负贡献
+    //   - 喜欢加分 + 不喜欢直接过滤
+    //   - 最近播放扣分(分级惩罚)
+    //   - 从未播放过加一点点新鲜度
+    //
+    // 输出顺序仍按 score 降序;不超出 r 半径,半径外的不进结果。
+    struct RankedTrack {
+        PlaylistTrack track;
+        float score;       // 综合得分
+        float dist;        // sqrt(dist_sq),便于前端展示
+        std::string fb;    // 'like' / '' (dislike 已过滤掉)
+        int last_played;   // 0 表示从未播过
+    };
+
+    std::vector<RankedTrack> get_playlist_ranked(float v, float a, float r, int limit,
+                                                 const std::vector<int> &exclude_ids = {}) {
+        std::vector<RankedTrack> list;
+        std::string excl;
+        if (!exclude_ids.empty()) {
+            excl = " AND t.id NOT IN (";
+            for (size_t i = 0; i < exclude_ids.size(); ++i) {
+                if (i > 0) excl += ",";
+                excl += std::to_string(exclude_ids[i]);
+            }
+            excl += ")";
+        }
+        // SQLite 没有 LEAST/GREATEST,用 CASE 分级。score 在 ORDER BY 里直接写表达式。
+        std::string sql = std::string(
+            "WITH lp AS ("
+            "  SELECT track_id, MAX(played_at) AS t FROM play_history GROUP BY track_id"
+            ") "
+            "SELECT t.id, t.filepath, t.filename, t.valence, t.arousal, t.duration, "
+            "  ((t.valence - ?) * (t.valence - ?) + (t.arousal - ?) * (t.arousal - ?)) AS dist_sq, "
+            "  COALESCE(uf.kind, '') AS fb, "
+            "  COALESCE(lp.t, 0) AS last_played, "
+            "  (-((t.valence - ?) * (t.valence - ?) + (t.arousal - ?) * (t.arousal - ?))) "
+            "  + CASE WHEN uf.kind = 'like' THEN 1.5 ELSE 0 END "
+            "  + CASE WHEN lp.t IS NULL THEN 0.4 ELSE 0 END "
+            "  + CASE "
+            "      WHEN lp.t > strftime('%s','now') -  1800 THEN -3.0 "
+            "      WHEN lp.t > strftime('%s','now') -  7200 THEN -1.4 "
+            "      WHEN lp.t > strftime('%s','now') - 21600 THEN -0.7 "
+            "      WHEN lp.t > strftime('%s','now') - 86400 THEN -0.2 "
+            "      ELSE 0 END AS score "
+            "FROM tracks t "
+            "LEFT JOIN user_feedback uf ON uf.track_id = t.id "
+            "LEFT JOIN lp ON lp.track_id = t.id "
+            "WHERE t.status = 2") + excl +
+            " AND COALESCE(uf.kind, '') != 'dislike' "
+            " AND ((t.valence - ?) * (t.valence - ?) + (t.arousal - ?) * (t.arousal - ?)) <= ? "
+            "ORDER BY score DESC LIMIT ?";
+
+        sqlite3_stmt *stmt;
+        sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, 0);
+        // dist_sq (SELECT)
+        sqlite3_bind_double(stmt, 1, v);
+        sqlite3_bind_double(stmt, 2, v);
+        sqlite3_bind_double(stmt, 3, a);
+        sqlite3_bind_double(stmt, 4, a);
+        // -dist_sq 部分(score 表达式里再算一次)
+        sqlite3_bind_double(stmt, 5, v);
+        sqlite3_bind_double(stmt, 6, v);
+        sqlite3_bind_double(stmt, 7, a);
+        sqlite3_bind_double(stmt, 8, a);
+        // WHERE dist_sq <= r²
+        sqlite3_bind_double(stmt, 9, v);
+        sqlite3_bind_double(stmt, 10, v);
+        sqlite3_bind_double(stmt, 11, a);
+        sqlite3_bind_double(stmt, 12, a);
+        sqlite3_bind_double(stmt, 13, r * r);
+        sqlite3_bind_int(stmt, 14, limit);
+
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            RankedTrack rt;
+            rt.track.id        = sqlite3_column_int(stmt, 0);
+            rt.track.filepath  = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1));
+            rt.track.title     = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 2));
+            rt.track.v         = (float) sqlite3_column_double(stmt, 3);
+            rt.track.a         = (float) sqlite3_column_double(stmt, 4);
+            rt.track.duration  = (float) sqlite3_column_double(stmt, 5);
+            float dist_sq      = (float) sqlite3_column_double(stmt, 6);
+            rt.dist            = std::sqrt(std::max(0.0f, dist_sq));
+            const unsigned char *fb_txt = sqlite3_column_text(stmt, 7);
+            rt.fb              = fb_txt ? reinterpret_cast<const char *>(fb_txt) : "";
+            rt.last_played     = sqlite3_column_int(stmt, 8);
+            rt.score           = (float) sqlite3_column_double(stmt, 9);
+            list.push_back(rt);
+        }
+        sqlite3_finalize(stmt);
+        return list;
+    }
+
     // 获取进度统计（成功数、失败数、总数）
     std::tuple<int, int, int> get_progress_stats() {
         int total = 0, done = 0, failed = 0;
