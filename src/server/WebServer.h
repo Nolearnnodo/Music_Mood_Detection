@@ -717,14 +717,20 @@ private:
             auto out_path = tmp_dir / (std::string("mood_chat_out_") + ts + ".json");
 
             try {
-                std::ofstream ofs(in_path, std::ios::binary);
-                ofs.write(req.body.data(), static_cast<std::streamsize>(req.body.size()));
-                ofs.close();
+                {
+                    std::ofstream ofs(in_path, std::ios::binary);
+                    if (!ofs) throw std::runtime_error("cannot open temp input file");
+                    ofs.write(req.body.data(),
+                              static_cast<std::streamsize>(req.body.size()));
+                }
 
-                // 调用 Python 脚本,stdout 重定向到 out_path
-                std::string cmd = "scripts\\.venv\\Scripts\\python.exe scripts\\llm_chat.py \"" +
-                                  in_path.string() + "\" > \"" + out_path.string() + "\"";
+                // 让 Python 直接把结果写到 out_path (argv[2]),不依赖 cmd 的 > 重定向
+                std::string cmd =
+                    "scripts\\.venv\\Scripts\\python.exe scripts\\llm_chat.py \"" +
+                    in_path.string() + "\" \"" + out_path.string() + "\"";
+                std::cout << "[Chat] $ " << cmd << std::endl;
                 int rc = std::system(cmd.c_str());
+                std::cout << "[Chat] exit=" << rc << std::endl;
 
                 std::ifstream ifs(out_path, std::ios::binary);
                 std::stringstream ss; ss << ifs.rdbuf();
@@ -736,13 +742,14 @@ private:
 
                 if (out.empty()) {
                     res.status = 500;
-                    res.set_content("{\"error\":\"empty LLM response\"}", "application/json");
+                    json err;
+                    err["error"] = "empty response from chat script";
+                    err["exit_code"] = rc;
+                    err["hint"] = "请确认 scripts/.venv 已创建且 scripts/llm_chat.py 可用";
+                    res.set_content(err.dump(), "application/json");
                     return;
                 }
-                if (rc != 0) {
-                    // Python 已经写了一个 error JSON 到 stdout,直接转发
-                    res.status = 502;
-                }
+                if (rc != 0) res.status = 502;  // Python 已写错误 JSON,转发即可
                 res.set_content(out, "application/json");
             } catch (const std::exception &e) {
                 std::error_code ec;

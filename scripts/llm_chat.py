@@ -120,10 +120,25 @@ def validate(parsed):
     return parsed
 
 
+def emit(parsed, out_path):
+    """把结果 JSON 写出去。优先写到 out_path,同时也打印到 stdout 方便调试。"""
+    text = json.dumps(parsed, ensure_ascii=False)
+    if out_path:
+        try:
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(text)
+        except Exception as e:
+            sys.stderr.write(f"write {out_path} failed: {e}\n")
+    sys.stdout.write(text + "\n")
+    sys.stdout.flush()
+
+
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] not in ("-", ""):
-        # utf-8-sig 兼容 PowerShell Set-Content -Encoding utf8 写出来的 BOM
-        with open(sys.argv[1], "r", encoding="utf-8-sig") as f:
+    in_arg  = sys.argv[1] if len(sys.argv) > 1 else None
+    out_arg = sys.argv[2] if len(sys.argv) > 2 else None
+
+    if in_arg and in_arg not in ("-", ""):
+        with open(in_arg, "r", encoding="utf-8-sig") as f:
             data = json.load(f)
     else:
         data = json.load(sys.stdin)
@@ -135,25 +150,22 @@ def main():
     model    = config.get("model")    or "gpt-4o-mini"
 
     if not api_key:
-        print(json.dumps({
-            "error": "missing api_key",
-            "hint": "请先在 /settings 页填写 LLM API Key 并保存"
-        }, ensure_ascii=False))
+        emit({"error": "missing api_key",
+              "hint": "请先在 /settings 页填写 LLM API Key 并保存"}, out_arg)
         sys.exit(2)
     if not messages:
-        print(json.dumps({"error": "messages empty"}))
+        emit({"error": "messages empty"}, out_arg)
         sys.exit(2)
 
     try:
         content = call_llm(base_url, api_key, model, messages)
     except Exception as e:
-        print(json.dumps({"error": str(e)}, ensure_ascii=False))
+        emit({"error": str(e)}, out_arg)
         sys.exit(1)
 
     try:
         parsed = json.loads(content)
     except Exception:
-        # 模型偶尔输出非纯 JSON,尝试夹取大括号区段
         s = content.strip()
         if s.startswith("```"):
             s = s.split("```")[1]
@@ -161,18 +173,16 @@ def main():
                 s = s[4:]
         start = s.find("{"); end = s.rfind("}")
         if start == -1 or end == -1:
-            print(json.dumps({"error": "non-json content", "raw": content[:300]},
-                             ensure_ascii=False))
+            emit({"error": "non-json content", "raw": content[:300]}, out_arg)
             sys.exit(3)
         try:
             parsed = json.loads(s[start:end + 1])
         except Exception:
-            print(json.dumps({"error": "json parse failed", "raw": content[:300]},
-                             ensure_ascii=False))
+            emit({"error": "json parse failed", "raw": content[:300]}, out_arg)
             sys.exit(3)
 
     parsed = validate(parsed)
-    print(json.dumps(parsed, ensure_ascii=False))
+    emit(parsed, out_arg)
 
 
 if __name__ == "__main__":
