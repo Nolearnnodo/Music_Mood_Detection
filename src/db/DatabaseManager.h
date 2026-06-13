@@ -81,6 +81,22 @@ public:
                 kind     TEXT NOT NULL,            -- 'like' / 'dislike'
                 ts       INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS users (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                uuid       TEXT UNIQUE NOT NULL,
+                nickname   TEXT NOT NULL,
+                created_at INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS presence (
+                user_id          INTEGER PRIMARY KEY,
+                mood_label       TEXT DEFAULT '',
+                valence          REAL DEFAULT 5,
+                arousal          REAL DEFAULT 5,
+                current_track_id INTEGER DEFAULT 0,
+                source           TEXT DEFAULT '',
+                updated_at       INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_presence_updated ON presence(updated_at);
             CREATE INDEX IF NOT EXISTS idx_va ON tracks(valence, arousal);
         )";
         char *errMsg = 0;
@@ -184,6 +200,129 @@ public:
         sqlite3_bind_int(stmt, 1, track_id);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
+    }
+
+    // --- 用户系统 ---
+
+    // 注册或获取用户(按 uuid 幂等)。返回 user_id (>0 成功)。
+    int register_user(const std::string &uuid, const std::string &nickname) {
+        // 1. INSERT OR IGNORE
+        const char *ins = "INSERT OR IGNORE INTO users (uuid, nickname, created_at) "
+                          "VALUES (?, ?, strftime('%s','now'))";
+        sqlite3_stmt *stmt;
+        sqlite3_prepare_v2(db, ins, -1, &stmt, 0);
+        sqlite3_bind_text(stmt, 1, uuid.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, nickname.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+
+        // 2. 查 id + 真实昵称(可能已被改过)
+        const char *sel = "SELECT id, nickname FROM users WHERE uuid = ?";
+        sqlite3_prepare_v2(db, sel, -1, &stmt, 0);
+        sqlite3_bind_text(stmt, 1, uuid.c_str(), -1, SQLITE_TRANSIENT);
+        int id = 0;
+        if (sqlite3_step(stmt) == SQLITE_ROW) id = sqlite3_column_int(stmt, 0);
+        sqlite3_finalize(stmt);
+        return id;
+    }
+
+    bool get_user(int user_id, std::string &uuid_out, std::string &nickname_out) {
+        const char *sql = "SELECT uuid, nickname FROM users WHERE id = ?";
+        sqlite3_stmt *stmt;
+        sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        sqlite3_bind_int(stmt, 1, user_id);
+        bool ok = false;
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            uuid_out     = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
+            nickname_out = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 1));
+            ok = true;
+        }
+        sqlite3_finalize(stmt);
+        return ok;
+    }
+
+    void update_presence(int user_id, const std::string &mood_label,
+                         float valence, float arousal, int current_track_id,
+                         const std::string &source) {
+        const char *sql =
+            "INSERT INTO presence (user_id, mood_label, valence, arousal, current_track_id, source, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, strftime('%s','now')) "
+            "ON CONFLICT(user_id) DO UPDATE SET "
+            "  mood_label=excluded.mood_label, valence=excluded.valence, "
+            "  arousal=excluded.arousal, current_track_id=excluded.current_track_id, "
+            "  source=excluded.source, updated_at=excluded.updated_at";
+        sqlite3_stmt *stmt;
+        sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        sqlite3_bind_int(stmt, 1, user_id);
+        sqlite3_bind_text(stmt, 2, mood_label.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_double(stmt, 3, valence);
+        sqlite3_bind_double(stmt, 4, arousal);
+        sqlite3_bind_int(stmt, 5, current_track_id);
+        sqlite3_bind_text(stmt, 6, source.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
+    struct PresenceMoodEntry { std::string label; int count; float sample_v; float sample_a; };
+    struct PresenceTrackEntry { int track_id; std::string title; int count; };
+
+    int count_active_users(int window_sec) {
+        const char *sql = "SELECT COUNT(*) FROM presence WHERE updated_at >= strftime('%s','now') - ?";
+        sqlite3_stmt *stmt;
+        sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        sqlite3_bind_int(stmt, 1, window_sec);
+        int n = 0;
+        if (sqlite3_step(stmt) == SQLITE_ROW) n = sqlite3_column_int(stmt, 0);
+        sqlite3_finalize(stmt);
+        return n;
+    }
+
+    std::vector<PresenceMoodEntry> get_active_mood_distribution(int window_sec) {
+        std::vector<PresenceMoodEntry> out;
+        const char *sql =
+            "SELECT mood_label, COUNT(*) AS c, AVG(valence) AS av, AVG(arousal) AS aa "
+            "FROM presence WHERE updated_at >= strftime('%s','now') - ? AND mood_label != '' "
+            "GROUP BY mood_label ORDER BY c DESC";
+        sqlite3_stmt *stmt;
+        sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        sqlite3_bind_int(stmt, 1, window_sec);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            PresenceMoodEntry e;
+            e.label    = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0));
+            e.count    = sqlite3_column_int(stmt, 1);
+            e.sample_v = (float) sqlite3_column_double(stmt, 2);
+            e.sample_a = (float) sqlite3_column_double(stmt, 3);
+            out.push_back(e);
+        }
+        sqlite3_finalize(stmt);
+        return out;
+    }
+
+    std::vector<PresenceTrackEntry> get_top_active_tracks(int window_sec, int top_n,
+                                                          int min_listeners) {
+        std::vector<PresenceTrackEntry> out;
+        const char *sql =
+            "SELECT p.current_track_id, COALESCE(t.filename, ''), COUNT(*) AS c "
+            "FROM presence p LEFT JOIN tracks t ON t.id = p.current_track_id "
+            "WHERE p.updated_at >= strftime('%s','now') - ? AND p.current_track_id > 0 "
+            "GROUP BY p.current_track_id "
+            "HAVING c >= ? "
+            "ORDER BY c DESC LIMIT ?";
+        sqlite3_stmt *stmt;
+        sqlite3_prepare_v2(db, sql, -1, &stmt, 0);
+        sqlite3_bind_int(stmt, 1, window_sec);
+        sqlite3_bind_int(stmt, 2, min_listeners);
+        sqlite3_bind_int(stmt, 3, top_n);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            PresenceTrackEntry e;
+            e.track_id = sqlite3_column_int(stmt, 0);
+            const unsigned char *t = sqlite3_column_text(stmt, 1);
+            e.title    = t ? reinterpret_cast<const char *>(t) : "";
+            e.count    = sqlite3_column_int(stmt, 2);
+            out.push_back(e);
+        }
+        sqlite3_finalize(stmt);
+        return out;
     }
 
     std::string get_track_path(int track_id) {

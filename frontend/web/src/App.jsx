@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import { AppStateProvider } from './contexts/AppStateContext';
 import ChatPage from './pages/ChatPage';
+import CommunityPage from './pages/CommunityPage';
 import JournalPage from './pages/JournalPage';
 import LibraryPage from './pages/LibraryPage';
 import MoodPage from './pages/MoodPage';
@@ -23,6 +24,7 @@ function App() {
             <Route path="/upload" element={<UploadPage/>}/>
             <Route path="/mood" element={<MoodPage/>}/>
             <Route path="/journal" element={<JournalPage/>}/>
+            <Route path="/community" element={<CommunityPage/>}/>
             <Route path="/settings" element={<SettingsPage/>}/>
             <Route path="*" element={<Navigate to="/radio" replace/>}/>
           </Route>

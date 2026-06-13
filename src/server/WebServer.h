@@ -973,6 +973,85 @@ private:
             res.set_content("{\"status\":\"started\"}", "application/json");
         });
 
+        // =================================================================================
+        // User identity + Presence
+        // =================================================================================
+        svr.Post("/api/user/register", [&](const httplib::Request &req, httplib::Response &res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
+            try {
+                auto j = json::parse(req.body);
+                std::string uuid = j.value("uuid", "");
+                std::string nickname = j.value("nickname", "匿名用户");
+                if (uuid.empty() || uuid.size() > 64) {
+                    res.status = 400;
+                    res.set_content("{\"error\":\"invalid uuid\"}", "application/json");
+                    return;
+                }
+                if (nickname.size() > 32) nickname = nickname.substr(0, 32);
+                int id = db.register_user(uuid, nickname);
+                if (id <= 0) {
+                    res.status = 500;
+                    res.set_content("{\"error\":\"failed to register\"}", "application/json");
+                    return;
+                }
+                std::string out_uuid, out_nick;
+                db.get_user(id, out_uuid, out_nick);
+                json out;
+                out["user_id"]  = id;
+                out["uuid"]     = out_uuid;
+                out["nickname"] = out_nick;
+                res.set_content(out.dump(), "application/json");
+            } catch (...) { res.status = 400; }
+        });
+
+        svr.Post("/api/presence", [&](const httplib::Request &req, httplib::Response &res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
+            try {
+                auto j = json::parse(req.body);
+                int user_id = j.value("user_id", 0);
+                if (user_id <= 0) {
+                    res.status = 400;
+                    res.set_content("{\"error\":\"missing user_id\"}", "application/json");
+                    return;
+                }
+                std::string mood   = j.value("mood_label", "");
+                float v            = j.value("valence", 5.0f);
+                float a            = j.value("arousal", 5.0f);
+                int track_id       = j.value("current_track_id", 0);
+                std::string source = j.value("source", "");
+                db.update_presence(user_id, mood, v, a, track_id, source);
+                res.set_content("{\"status\":\"ok\"}", "application/json");
+            } catch (...) { res.status = 400; }
+        });
+
+        svr.Get("/api/presence/summary", [&](const httplib::Request &req, httplib::Response &res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
+            int window_sec = 300;
+            int top_n = 5;
+            int min_listeners = 1; // 演示场景默认门槛 1, ≥ 3 时启用隐私门槛
+            if (req.has_param("window")) window_sec = std::max(30, std::stoi(req.get_param_value("window")));
+            if (req.has_param("top_n"))  top_n      = std::max(1,  std::stoi(req.get_param_value("top_n")));
+            if (req.has_param("min_listeners")) min_listeners = std::max(1, std::stoi(req.get_param_value("min_listeners")));
+
+            int active = db.count_active_users(window_sec);
+            auto moods = db.get_active_mood_distribution(window_sec);
+            auto tracks = db.get_top_active_tracks(window_sec, top_n, min_listeners);
+
+            json out;
+            out["active_users"] = active;
+            out["window_sec"] = window_sec;
+            json jm = json::array();
+            for (auto &m : moods)
+                jm.push_back({{"label", m.label}, {"count", m.count},
+                              {"sample_valence", m.sample_v}, {"sample_arousal", m.sample_a}});
+            out["moods"] = jm;
+            json jt = json::array();
+            for (auto &t : tracks)
+                jt.push_back({{"track_id", t.track_id}, {"title", t.title}, {"count", t.count}});
+            out["top_tracks"] = jt;
+            res.set_content(out.dump(), "application/json");
+        });
+
         // FS Browse
         svr.Get("/api/fs/browse", [&](const httplib::Request &req, httplib::Response &res) {
              if (is_read_only) {

@@ -42,3 +42,7 @@ ui-ux-pro-max-skill/
 # Cover artwork archive (do not commit)
 *.rar
 /covers/
+
+# OpenSpec CLI tool source (the npm package vendored at top-level).
+# This project's own specs live in /project-specs/ — see that folder.
+/OpenSpec/

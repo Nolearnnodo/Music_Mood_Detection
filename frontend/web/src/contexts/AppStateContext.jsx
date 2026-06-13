@@ -2,6 +2,7 @@ import axios from 'axios';
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import { useEmotionLog } from '../hooks/useEmotionLog';
+import { useUser } from '../hooks/useUser';
 import { getTimeSlot } from '../timeSlot';
 
 const AppStateContext = createContext(null);
@@ -301,6 +302,28 @@ export function AppStateProvider({ children }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 用户身份 + 心跳
+  const { user, renameLocal } = useUser();
+  useEffect(() => {
+    if (!user?.user_id) return;
+    const send = () => {
+      const moodLabel = manualEmotion?.label || faceEmotion?.label || '';
+      const sourceKey = manualEmotion ? 'manual' : (faceEmotion ? 'camera' : '');
+      axios.post('/api/presence', {
+        user_id: user.user_id,
+        mood_label: moodLabel,
+        valence: faceEmotion?.scores ? 5 : 5, // 估算可后续完善
+        arousal: 5,
+        current_track_id: currentTrack?.id || 0,
+        source: sourceKey
+      }).catch(() => {});
+    };
+    // 立即发一次,然后 60 秒一发
+    send();
+    const id = setInterval(send, 60_000);
+    return () => clearInterval(id);
+  }, [user?.user_id, faceEmotion?.label, manualEmotion?.label, currentTrack?.id]);
+
   // 当前时段(每分钟自动更新)
   const [currentTimeSlot, setCurrentTimeSlot] = useState(() => getTimeSlot());
   useEffect(() => {
@@ -400,6 +423,7 @@ export function AppStateProvider({ children }) {
     handleHeadGesture, handleStableEmotionChange,
     handleChatRecommendation,
     currentTimeSlot, handleTimeSlotRecommend,
+    user, renameLocal,
     fetchTracks, refreshScanStatus: startSSE
   };
 

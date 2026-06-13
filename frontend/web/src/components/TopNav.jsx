@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   Laptop, ListMusic, MessageCircle, Moon, Music, NotebookText, Radio,
-  Settings as SettingsIcon, Sparkles, Sun, Upload
+  Settings as SettingsIcon, Sparkles, Sun, Upload, Users
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { to: '/upload', label: '上传', icon: Upload },
   { to: '/mood', label: '情绪图谱', icon: Sparkles },
   { to: '/journal', label: '心情日志', icon: NotebookText },
+  { to: '/community', label: '群体此刻', icon: Users },
   { to: '/settings', label: '设置', icon: SettingsIcon }
 ];
 

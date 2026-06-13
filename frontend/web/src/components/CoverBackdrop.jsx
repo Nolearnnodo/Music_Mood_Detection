@@ -49,17 +49,17 @@ function CoverBackdrop() {
             alt=""
             className="absolute inset-0 w-full h-full object-cover"
             style={{
-              filter: 'blur(48px) saturate(1.3) brightness(0.55)',
-              transform: 'scale(1.15)'
+              filter: 'blur(22px) saturate(1.4) brightness(0.7)',
+              transform: 'scale(1.08)'
             }}
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
             draggable={false}
           />
-          {/* 上下淡黑遮罩,保证文字可读性 */}
+          {/* 上下淡黑遮罩,保证文字可读性。比之前更轻一点 */}
           <div className="absolute inset-0"
             style={{
               background:
-                'linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.20) 40%, rgba(0,0,0,0.55) 100%)'
+                'linear-gradient(to bottom, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.10) 40%, rgba(0,0,0,0.45) 100%)'
             }}
           />
         </div>
