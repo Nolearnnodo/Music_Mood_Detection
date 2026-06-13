@@ -11,11 +11,12 @@ import sqlite3
 import sys
 import time
 
+import os
 import numpy as np
 import librosa
 import onnxruntime as ort
 
-DB_PATH = "music_mood.db"
+DB_PATH = os.environ.get("MOOD_DB_PATH", "music_mood.db")
 SR = 16000
 N_FFT = 512
 HOP = 256

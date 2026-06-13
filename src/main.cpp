@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
 
         // 4. 启动 Web 服务器 (阻塞运行)
         // 传入 host 和 port, read_only
-        WebServer server(db, scanner, web_root, music_dir, host, port, read_only, !api_only);
+        WebServer server(db, scanner, web_root, music_dir, db_path, host, port, read_only, !api_only);
     } catch (const std::exception &e) {
         std::cerr << "Fatal Error: " << e.what() << std::endl;
         return -1;

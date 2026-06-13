@@ -32,6 +32,7 @@ class WebServer {
     LibraryScanner &scanner;
     std::string web_root;
     std::string music_dir;          // 用户上传音乐固定目录 (UTF-8)
+    std::string db_path;            // SQLite 数据库路径(相对/绝对都行,传给 Python 用环境变量)
     bool is_read_only;
     bool serve_static_files;
 
@@ -43,12 +44,60 @@ class WebServer {
     // Reanalyze (Python 子进程) 状态,避免并发
     std::atomic<bool> reanalyze_running{false};
 
+    // 启动时定位到的 scripts 目录(绝对路径,带反斜杠)
+    std::string project_root;           // .../ (含 scripts/、models/、music_mood.db)
+    std::string scripts_dir;            // .../scripts
+    std::string python_exe;             // .../scripts/.venv/Scripts/python.exe
+    std::string script_analyze_all;     // .../scripts/analyze_all.py
+    std::string script_llm_chat;        // .../scripts/llm_chat.py
+
+    // 从 CWD 起向上 5 级目录,查找含 scripts/.venv 的项目根。返回是否成功。
+    bool locate_scripts_dir() {
+        std::error_code ec;
+        auto cwd = std::filesystem::current_path(ec);
+        if (ec) return false;
+        for (int i = 0; i < 5; ++i) {
+            auto candidate = cwd / "scripts" / ".venv" / "Scripts" / "python.exe";
+            if (std::filesystem::exists(candidate, ec)) {
+                project_root       = cwd.string();
+                scripts_dir        = (cwd / "scripts").string();
+                python_exe         = candidate.string();
+                script_analyze_all = (cwd / "scripts" / "analyze_all.py").string();
+                script_llm_chat    = (cwd / "scripts" / "llm_chat.py").string();
+                std::cout << "[Init] Project root: " << project_root << std::endl;
+                std::cout << "[Init] Scripts dir : " << scripts_dir << std::endl;
+                return true;
+            }
+            if (!cwd.has_parent_path() || cwd == cwd.parent_path()) break;
+            cwd = cwd.parent_path();
+        }
+        std::cerr << "[Warning] scripts/.venv not found within 5 parent dirs. "
+                  << "Chat and reanalyze will fail until you create it. "
+                  << "Run from project root or 'uv venv --python 3.12 scripts/.venv'." << std::endl;
+        return false;
+    }
+
+    // 把命令包成可执行(转义双引号),适用于 std::system + Windows cmd.exe。
+    static std::string quote(const std::string &s) {
+        return std::string("\"") + s + "\"";
+    }
+
+    // 用于让 std::system 调用的 Python 看到正确 CWD + MOOD_DB_PATH 环境变量。
+    // 返回 cmd /c "set MOOD_DB_PATH=... && cd /d <root> && <inner> "
+    std::string wrap_python_cmd(const std::string &inner) const {
+        std::error_code ec;
+        std::string abs_db = std::filesystem::absolute(
+            Encoding::to_fs_path(db_path), ec).string();
+        return std::string("cmd /c \"set \"MOOD_DB_PATH=") + abs_db + "\" && " +
+               "cd /d " + quote(project_root) + " && " + inner + "\"";
+    }
+
 public:
     WebServer(DatabaseManager &_db, LibraryScanner &_sc, const std::string &_web_root,
-              const std::string &_music_dir,
+              const std::string &_music_dir, const std::string &_db_path,
               const std::string &host, int port, bool read_only, bool serve_static = true)
         : db(_db), scanner(_sc), web_root(_web_root), music_dir(_music_dir),
-          is_read_only(read_only), serve_static_files(serve_static) {
+          db_path(_db_path), is_read_only(read_only), serve_static_files(serve_static) {
 
         // 确保上传目录存在
         try {
@@ -142,6 +191,7 @@ public:
             }
         });
 
+        locate_scripts_dir();
         setup_routes();
 
         std::cout << "Server trying to listen at http://" << host << ":" << port << std::endl;
@@ -789,11 +839,19 @@ private:
 
             bool full = req.has_param("full") && req.get_param_value("full") == "true";
 
+            if (python_exe.empty()) {
+                reanalyze_running.store(false);
+                res.status = 500;
+                res.set_content("{\"error\":\"scripts/.venv not found, see server log\"}",
+                                "application/json");
+                return;
+            }
+
             std::thread([this, full]() {
-                // 假设可执行文件 CWD = 项目根目录
-                std::string cmd = "scripts\\.venv\\Scripts\\python.exe "
-                                  "scripts\\analyze_all.py --apply --preproc cpp";
-                if (!full) cmd += " --only-pending";
+                std::string inner = quote(python_exe) + " " + quote(script_analyze_all) +
+                                    " --apply --preproc cpp";
+                if (!full) inner += " --only-pending";
+                std::string cmd = wrap_python_cmd(inner);
 
                 std::cout << "[Reanalyze] $ " << cmd << std::endl;
                 broadcast_status("Reanalyzing tracks...");
@@ -836,6 +894,14 @@ private:
             auto out_path = tmp_dir / (std::string("mood_chat_out_") + ts + ".json");
 
             try {
+                if (python_exe.empty()) {
+                    res.status = 500;
+                    json err;
+                    err["error"] = "scripts/.venv not found at backend startup";
+                    err["hint"]  = "请确保从仓库根目录启动 MusicMoodCLI 或在 scripts/ 下创建 .venv";
+                    res.set_content(err.dump(), "application/json");
+                    return;
+                }
                 {
                     std::ofstream ofs(in_path, std::ios::binary);
                     if (!ofs) throw std::runtime_error("cannot open temp input file");
@@ -843,10 +909,11 @@ private:
                               static_cast<std::streamsize>(req.body.size()));
                 }
 
-                // 让 Python 直接把结果写到 out_path (argv[2]),不依赖 cmd 的 > 重定向
-                std::string cmd =
-                    "scripts\\.venv\\Scripts\\python.exe scripts\\llm_chat.py \"" +
-                    in_path.string() + "\" \"" + out_path.string() + "\"";
+                // 让 Python 直接把结果写到 out_path (argv[2]),不依赖 cmd 的 > 重定向。
+                std::string inner = quote(python_exe) + " " + quote(script_llm_chat) +
+                                    " " + quote(in_path.string()) +
+                                    " " + quote(out_path.string());
+                std::string cmd = wrap_python_cmd(inner);
                 std::cout << "[Chat] $ " << cmd << std::endl;
                 int rc = std::system(cmd.c_str());
                 std::cout << "[Chat] exit=" << rc << std::endl;
@@ -957,9 +1024,17 @@ private:
                 res.set_content("{\"error\":\"Reanalysis already running\"}", "application/json");
                 return;
             }
+            if (python_exe.empty()) {
+                reanalyze_running.store(false);
+                res.status = 500;
+                res.set_content("{\"error\":\"scripts/.venv not found, see server log\"}",
+                                "application/json");
+                return;
+            }
             std::thread([this]() {
-                std::string cmd = "scripts\\.venv\\Scripts\\python.exe "
-                                  "scripts\\analyze_all.py --apply --preproc cpp --only-pending";
+                std::string inner = quote(python_exe) + " " + quote(script_analyze_all) +
+                                    " --apply --preproc cpp --only-pending";
+                std::string cmd = wrap_python_cmd(inner);
                 std::cout << "[Reanalyze:single] $ " << cmd << std::endl;
                 std::system(cmd.c_str());
                 reanalyze_running.store(false);
