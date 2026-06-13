@@ -311,7 +311,7 @@ function Player({
       </div>
 
       {/* 情绪数值 */}
-      <div className="flex justify-between items-center text-[10px] text-slate-400 px-1">
+      <div className="flex flex-wrap justify-between items-center gap-2 text-[10px] text-slate-400 px-1">
         <div className="flex gap-2">
           <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded flex items-center gap-1 border border-transparent dark:border-slate-700">
             V: <span className={displayTrack.v >= 5 ? 'text-pink-500' : 'text-blue-500'}>{displayTrack.v?.toFixed(1)}</span>
@@ -321,11 +321,13 @@ function Player({
           </span>
         </div>
 
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap justify-end gap-2 items-center">
           {/* like / dislike */}
           <button
+            type="button"
             onClick={() => sendFeedback('like')}
             title={currentFeedback === 'like' ? '取消喜欢' : '喜欢'}
+            aria-label={currentFeedback === 'like' ? '取消喜欢当前歌曲' : '喜欢当前歌曲'}
             aria-pressed={currentFeedback === 'like'}
             className={`p-1 rounded transition-colors ${
               currentFeedback === 'like'
@@ -336,8 +338,10 @@ function Player({
             <ThumbsUp size={12}/>
           </button>
           <button
+            type="button"
             onClick={() => sendFeedback('dislike')}
             title={currentFeedback === 'dislike' ? '取消不喜欢' : '不喜欢'}
+            aria-label={currentFeedback === 'dislike' ? '取消不喜欢当前歌曲' : '不喜欢当前歌曲'}
             aria-pressed={currentFeedback === 'dislike'}
             className={`p-1 rounded transition-colors ${
               currentFeedback === 'dislike'
@@ -355,7 +359,10 @@ function Player({
           )}
           {playlist.length > 1 && (
             <button
+              type="button"
               onClick={() => setShowPlaylist(!showPlaylist)}
+              aria-expanded={showPlaylist}
+              aria-label={showPlaylist ? '收起播放列表' : '展开播放列表'}
               className={`
                     flex items-center gap-1 px-2 py-0.5 rounded transition-all
                     ${showPlaylist
@@ -420,12 +427,14 @@ function Player({
           </div>
           <div className="max-h-60 overflow-y-auto custom-scrollbar pr-1">
             {playlist.map((track, idx) => (
-              <div
+              <button
+                type="button"
                 key={track.id}
                 ref={idx === currentIndex ? activeTrackRef : null}
                 onClick={() => handleJumpTo(idx)}
+                aria-current={idx === currentIndex ? 'true' : undefined}
                 className={`
-                    text-xs p-2 rounded cursor-pointer flex justify-between items-center mb-1 last:mb-0 transition-colors group
+                    w-full text-left text-xs p-2 rounded cursor-pointer flex justify-between items-center mb-1 last:mb-0 transition-colors group
                     ${idx === currentIndex
                 ? 'bg-blue-500 text-white shadow-sm'
                 : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'}
@@ -441,7 +450,7 @@ function Player({
                   className={`flex gap-2 text-[9px] font-mono shrink-0 ${idx === currentIndex ? 'opacity-90' : 'opacity-0 group-hover:opacity-60'}`}>
                   <span>{Math.floor(track.duration / 60)}:{Math.floor(track.duration % 60).toString().padStart(2, '0')}</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -450,10 +459,14 @@ function Player({
       {/* 底部控制区域 */}
       <div className="border-t border-mood-border pt-3 mt-1">
         <div className="flex justify-between items-center mb-2 px-1">
-          <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Similarity Radius</span>
+          <label htmlFor="similarity-radius" className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
+            Similarity Radius
+          </label>
           <span className="text-xs font-mono text-mood-text">{radius.toFixed(1)}</span>
         </div>
         <input
+          id="similarity-radius"
+          aria-label="相似歌单半径"
           type="range" min="0.1" max="4.0" step="0.1"
           value={radius}
           onChange={e => setRadius(Number.parseFloat(e.target.value))}
@@ -462,6 +475,7 @@ function Player({
 
         <div className="grid grid-cols-4 gap-2">
           <button
+            type="button"
             onClick={handleManualGenerate}
             className="col-span-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-mood-text border border-mood-border text-xs py-2 rounded-lg flex items-center justify-center gap-2 transition-colors font-medium"
           >
@@ -469,6 +483,7 @@ function Player({
           </button>
 
           <button
+            type="button"
             onClick={() => onExportPlaylist(displayTrack, radius, 'm3u')}
             className="col-span-2 bg-blue-600 hover:bg-blue-700 text-white text-xs py-2 rounded-lg flex items-center justify-center gap-1 transition-colors"
           >
@@ -476,6 +491,7 @@ function Player({
           </button>
 
           <button
+            type="button"
             onClick={() => onExportPlaylist(displayTrack, radius, 'pls')}
             className="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-mood-text text-xs py-2 rounded-lg flex items-center justify-center gap-1 transition-colors"
           >
@@ -483,6 +499,7 @@ function Player({
           </button>
 
           <button
+            type="button"
             onClick={() => onExportPlaylist(displayTrack, radius, 'txt')}
             className="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-mood-text text-xs py-2 rounded-lg flex items-center justify-center gap-1 transition-colors"
           >

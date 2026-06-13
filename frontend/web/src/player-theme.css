@@ -76,7 +76,8 @@
     z-index: 20;
 }
 
-.rhap_progress-container:hover .rhap_progress-indicator {
+.rhap_progress-container:hover .rhap_progress-indicator,
+.rhap_progress-container:focus-within .rhap_progress-indicator {
     opacity: 1;
 }
 
@@ -97,6 +98,13 @@
 
 .rhap_main-controls-button:hover {
     color: #3b82f6 !important;
+}
+
+.rhap_main-controls-button:focus-visible,
+.rhap_volume-button:focus-visible {
+    outline: 2px solid var(--mood-accent-glow);
+    outline-offset: 2px;
+    border-radius: 999px;
 }
 
 .rhap_main-controls-button:active {
@@ -159,4 +167,14 @@
     height: 10px !important;
     border: 2px solid var(--card-color);
     opacity: 1 !important;
+}
+
+@media (max-width: 420px) {
+    .rhap_controls-section {
+        justify-content: center !important;
+    }
+
+    .rhap_volume-controls {
+        display: none !important;
+    }
 }
