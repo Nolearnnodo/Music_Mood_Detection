@@ -11,6 +11,7 @@ import {
 
 import 'react-h5-audio-player/lib/styles.css';
 import '../player-theme.css';
+import VinylDisc from './VinylDisc';
 
 function Player({
   selectedTrack,
@@ -37,6 +38,7 @@ function Player({
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [errorMsg, setErrorMsg] = useState(null);
   const [showPlaylist, setShowPlaylist] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [fullTrackInfo, setFullTrackInfo] = useState(null);
 
   // 计算总时长
@@ -292,15 +294,12 @@ function Player({
 
       {/* 封面与信息 */}
       <div className="flex gap-3 items-center px-1">
-        <div className="w-12 h-12 rounded bg-slate-200 dark:bg-slate-700 overflow-hidden shrink-0 border border-mood-border relative">
-          {displayTrack.cover ? (
-            <img src={displayTrack.cover} alt="cover" className="w-full h-full object-cover animate-in fade-in duration-300"/>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-slate-400">
-              <Music size={20}/>
-            </div>
-          )}
-        </div>
+        <VinylDisc
+          trackId={displayTrack.id}
+          cover={displayTrack.cover || undefined}
+          playing={isPlaying}
+          size={64}
+        />
         <div className="flex flex-col gap-0.5 min-w-0 flex-1">
           <h3 className="text-sm font-bold text-mood-text truncate" title={displayTrack.title}>
             {displayTrack.title || '未知曲目'}
@@ -393,6 +392,9 @@ function Player({
           onClickNext={handleClickNext}
           onClickPrevious={handleClickPrev}
           onEnded={handleEnded}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onAbort={() => setIsPlaying(false)}
           customIcons={{
             play: <Play fill="currentColor" size={24}/>,
             pause: <Pause fill="currentColor" size={24}/>,

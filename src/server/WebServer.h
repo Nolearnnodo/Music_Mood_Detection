@@ -299,6 +299,67 @@ private:
         });
 
         // =================================================================================
+        // Cover image API: 优先匹配 Music_Directory/.covers/<filename>.png,其次 mp3 内嵌封面
+        // =================================================================================
+        svr.Get("/api/cover", [&](const httplib::Request &req, httplib::Response &res) {
+            res.set_header("Access-Control-Allow-Origin", "*");
+            res.set_header("Cache-Control", "public, max-age=3600");
+            if (!req.has_param("id")) { res.status = 400; return; }
+            try {
+                int id = std::stoi(req.get_param_value("id"));
+                std::string path_u8 = db.get_track_path(id);
+                if (path_u8.empty()) { res.status = 404; return; }
+
+                // 1. 找 .covers/<basename + 完整扩展>.png
+                std::filesystem::path audio = Encoding::to_fs_path(path_u8);
+                std::filesystem::path cover_dir = Encoding::to_fs_path(music_dir) / ".covers";
+                std::string fname_u8 = Encoding::to_utf8_string(audio.filename());
+
+                static const std::vector<std::string> exts = { ".png", ".jpg", ".jpeg", ".webp" };
+                std::filesystem::path found;
+                for (const auto &ext : exts) {
+                    auto candidate = cover_dir / Encoding::to_fs_path(fname_u8 + ext);
+                    std::error_code ec;
+                    if (std::filesystem::exists(candidate, ec)) { found = candidate; break; }
+                }
+                // 也尝试不带 .mp3 后缀的版本
+                if (found.empty()) {
+                    std::string stem = Encoding::to_utf8_string(audio.stem());
+                    for (const auto &ext : exts) {
+                        auto candidate = cover_dir / Encoding::to_fs_path(stem + ext);
+                        std::error_code ec;
+                        if (std::filesystem::exists(candidate, ec)) { found = candidate; break; }
+                    }
+                }
+
+                if (!found.empty()) {
+                    std::string ext = Encoding::to_utf8_string(found.extension());
+                    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+                    std::string mime = "image/png";
+                    if (ext == ".jpg" || ext == ".jpeg") mime = "image/jpeg";
+                    else if (ext == ".webp") mime = "image/webp";
+
+                    std::ifstream ifs(found, std::ios::binary);
+                    std::stringstream ss; ss << ifs.rdbuf();
+                    res.set_content(ss.str(), mime.c_str());
+                    return;
+                }
+
+                // 2. 回退到 mp3 内嵌封面
+                TrackMetadata meta = AudioDecoder::extract_metadata(path_u8);
+                if (!meta.cover_data.empty()) {
+                    std::string blob(reinterpret_cast<const char *>(meta.cover_data.data()),
+                                     meta.cover_data.size());
+                    res.set_content(blob,
+                        meta.cover_mime.empty() ? "image/jpeg" : meta.cover_mime.c_str());
+                    return;
+                }
+
+                res.status = 404;
+            } catch (...) { res.status = 500; }
+        });
+
+        // =================================================================================
         // Stream API
         // =================================================================================
         svr.Get("/api/stream", [&](const httplib::Request &req, httplib::Response &res) {

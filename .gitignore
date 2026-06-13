@@ -37,3 +37,8 @@ Thumbs.db
 .idea/
 # ui-ux-pro-max design intelligence toolkit (skill)
 ui-ux-pro-max-skill/
+
+
+# Cover artwork archive (do not commit)
+*.rar
+/covers/

@@ -5,6 +5,7 @@ import {
   RefreshCw, Search, ThumbsDown, ThumbsUp, Trash2, X
 } from 'lucide-react';
 
+import VinylDisc from '../components/VinylDisc';
 import { useAppState } from '../contexts/AppStateContext';
 
 const QUADRANTS = [
@@ -226,9 +227,14 @@ function LibraryPage() {
 
             {detail && !detail.error && (
               <>
-                {detail.cover && (
-                  <img src={detail.cover} alt="cover" className="w-full aspect-square object-cover rounded-lg"/>
-                )}
+                <div className="flex justify-center py-2">
+                  <VinylDisc
+                    trackId={selected.id}
+                    cover={detail.cover || undefined}
+                    playing={false}
+                    size={220}
+                  />
+                </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="bg-slate-100/60 dark:bg-slate-800/60 rounded-md px-2 py-1">
                     <div className="text-[10px] text-slate-500">艺术家</div>
