@@ -105,6 +105,13 @@ cmake --build build --config Release
 # 终端 1：从仓库根目录启动后端 API
 ./build/Release/MusicMoodCLI.exe --api-only --model-dir ./models
 
+.\build\Release\MusicMoodCLI.exe `
+  --api-only `
+  --no-vulkan `
+  --model-dir .\models `
+  --music-dir .\Music_Directory `
+  --port 8080
+
 # 终端 2：启动前端开发服务器
 cd frontend/web
 npm install

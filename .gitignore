@@ -46,3 +46,6 @@ ui-ux-pro-max-skill/
 # OpenSpec CLI tool source (the npm package vendored at top-level).
 # This project's own specs live in /project-specs/ — see that folder.
 /OpenSpec/
+
+/img
+/music
