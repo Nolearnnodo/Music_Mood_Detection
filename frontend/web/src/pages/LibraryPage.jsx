@@ -44,6 +44,12 @@ function LibraryPage() {
     if (realIndex >= 0) handleChartClick(realIndex);
   };
 
+  const handleDetailKeyDown = (event, track) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    openDetail(track);
+  };
+
   const openDetail = async (t) => {
     setSelected(t);
     setDetail(null);
@@ -138,13 +144,25 @@ function LibraryPage() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="按歌名搜索..."
-                className="w-full bg-slate-50/60 dark:bg-slate-800/60 text-mood-text pl-9 pr-3 py-2 rounded-lg border border-mood-border focus:outline-none focus:border-mood-accent focus:ring-2 focus:ring-mood-accent-soft text-sm transition-colors"
+                aria-label="按歌名搜索"
+                className="w-full bg-slate-50/60 dark:bg-slate-800/60 text-mood-text pl-9 pr-9 py-2 rounded-lg border border-mood-border focus:outline-none focus:border-mood-accent focus:ring-2 focus:ring-mood-accent-soft text-sm transition-colors"
               />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-2 top-2 p-0.5 rounded text-slate-400 hover:text-mood-text hover:bg-mood-accent-soft transition-colors"
+                  aria-label="清空搜索"
+                >
+                  <X size={14}/>
+                </button>
+              )}
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap" role="group" aria-label="按情绪象限筛选">
               <Filter size={14} className="text-slate-400"/>
               {QUADRANTS.map(q => (
                 <button
+                  type="button"
                   key={q.id}
                   onClick={() => setQuadrant(q.id)}
                   aria-pressed={quadrant === q.id}
@@ -160,7 +178,7 @@ function LibraryPage() {
             </div>
           </div>
 
-          <div className="text-xs text-slate-500 dark:text-slate-400">
+          <div className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
             共 {filtered.length} 首匹配 · 点行打开详情
           </div>
 
@@ -174,10 +192,14 @@ function LibraryPage() {
               return (
                 <div
                   key={t.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-selected={isSelected}
                   className={`flex items-center gap-3 px-4 py-2 text-sm border-b last:border-b-0 border-mood-border transition-colors cursor-pointer ${
                     isSelected ? 'bg-mood-accent-soft' : 'hover:bg-mood-accent-soft/40'
                   }`}
                   onClick={() => openDetail(t)}
+                  onKeyDown={(event) => handleDetailKeyDown(event, t)}
                   title={t.title}
                 >
                   <span className="font-mono text-xs opacity-50 w-8 shrink-0">{idx + 1}</span>
@@ -188,9 +210,11 @@ function LibraryPage() {
                     V {t.v?.toFixed(1)} / A {t.a?.toFixed(1)}
                   </span>
                   <button
+                    type="button"
                     onClick={(e) => { e.stopPropagation(); handlePlay(idx); }}
                     className="p-1 rounded text-mood-accent hover:bg-mood-accent-soft shrink-0"
                     title="播放"
+                    aria-label={`播放 ${t.title || '曲目'}`}
                   >
                     <Play size={14}/>
                   </button>
@@ -209,15 +233,17 @@ function LibraryPage() {
                 曲目详情
               </div>
               <button
+                type="button"
                 onClick={closeDetail}
                 className="p-1 rounded text-slate-400 hover:text-mood-text hover:bg-mood-accent-soft"
                 aria-label="关闭"
+                title="关闭详情"
               >
                 <X size={14}/>
               </button>
             </div>
 
-            <div className="text-mood-text text-sm font-medium leading-snug">{selected.title}</div>
+            <div className="text-mood-text text-sm font-medium leading-snug break-words">{selected.title}</div>
 
             {detailLoading && (
               <div className="flex items-center gap-2 text-xs text-slate-500">
@@ -235,7 +261,7 @@ function LibraryPage() {
                     size={220}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   <div className="bg-slate-100/60 dark:bg-slate-800/60 rounded-md px-2 py-1">
                     <div className="text-[10px] text-slate-500">艺术家</div>
                     <div className="text-mood-text truncate">{detail.artist}</div>
@@ -252,7 +278,7 @@ function LibraryPage() {
                     <div className="text-[10px] text-slate-500">Arousal</div>
                     <div className="font-mono text-mood-text">{selected.a?.toFixed(2)}</div>
                   </div>
-                  <div className="bg-slate-100/60 dark:bg-slate-800/60 rounded-md px-2 py-1 col-span-2">
+                  <div className="bg-slate-100/60 dark:bg-slate-800/60 rounded-md px-2 py-1 sm:col-span-2">
                     <div className="text-[10px] text-slate-500">文件</div>
                     <div className="font-mono text-mood-text text-[10px] truncate" title={detail.path}>{detail.path}</div>
                   </div>
@@ -266,6 +292,7 @@ function LibraryPage() {
 
             <div className="grid grid-cols-2 gap-2">
               <button
+                type="button"
                 onClick={() => sendFeedback('like')}
                 aria-pressed={feedbackMap[selected.id] === 'like'}
                 className={`text-xs px-3 py-1.5 rounded-md border flex items-center gap-1 justify-center transition-all duration-300 ${
@@ -277,6 +304,7 @@ function LibraryPage() {
                 <ThumbsUp size={12}/> 喜欢
               </button>
               <button
+                type="button"
                 onClick={() => sendFeedback('dislike')}
                 aria-pressed={feedbackMap[selected.id] === 'dislike'}
                 className={`text-xs px-3 py-1.5 rounded-md border flex items-center gap-1 justify-center transition-all duration-300 ${
@@ -291,20 +319,23 @@ function LibraryPage() {
 
             <div className="flex flex-col gap-2">
               <button
+                type="button"
                 onClick={() => { const realIdx = tracks.findIndex(t => t.id === selected.id); if (realIdx >= 0) handleChartClick(realIdx); }}
                 className="text-xs px-3 py-1.5 rounded-md bg-mood-accent text-mood-accent-on hover:brightness-110 flex items-center gap-1 justify-center transition-all duration-300 shadow-[0_0_18px_-4px_var(--mood-accent-glow)]"
               >
                 <Play size={12}/> 播放
               </button>
               <button
+                type="button"
                 onClick={reanalyzeOne}
                 disabled={actionBusy}
                 className="text-xs px-3 py-1.5 rounded-md border border-mood-border text-mood-text hover:bg-mood-accent-soft disabled:opacity-50 flex items-center gap-1 justify-center transition-colors"
               >
                 {actionBusy ? <Loader2 size={12} className="animate-spin"/> : <RefreshCw size={12}/>} 重新分析
               </button>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <button
+                  type="button"
                   onClick={() => deleteOne(false)}
                   disabled={actionBusy}
                   className="flex-1 text-xs px-3 py-1.5 rounded-md border border-mood-border text-mood-text hover:bg-red-500/10 hover:border-red-500/40 disabled:opacity-50 flex items-center gap-1 justify-center transition-colors"
@@ -312,6 +343,7 @@ function LibraryPage() {
                   <Trash2 size={12}/> 从库删除
                 </button>
                 <button
+                  type="button"
                   onClick={() => deleteOne(true)}
                   disabled={actionBusy}
                   className="flex-1 text-xs px-3 py-1.5 rounded-md border border-red-500/40 text-red-500 hover:bg-red-500 hover:text-white disabled:opacity-50 flex items-center gap-1 justify-center transition-colors"
