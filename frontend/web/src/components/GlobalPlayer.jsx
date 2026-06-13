@@ -31,7 +31,7 @@ function GlobalPlayer() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 w-[min(420px,calc(100vw-2rem))] max-h-[min(70vh,640px)] overflow-hidden">
+    <div className="fixed bottom-3 left-3 right-3 sm:left-auto sm:right-4 sm:bottom-4 z-40 w-auto sm:w-[min(420px,calc(100vw-2rem))] max-h-[min(72dvh,640px)] overflow-y-auto custom-scrollbar">
       <Player
         selectedTrack={selectedTrack}
         onTrackChange={handlePlayerTrackChange}
