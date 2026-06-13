@@ -65,7 +65,7 @@ body {
   background-color: var(--bg-color);
   color: var(--text-color);
   transition: background-color 500ms ease, color 500ms ease;
-  min-height: 100vh;
+  min-height: 100dvh;
   position: relative;
   overflow-x: hidden;
 }
@@ -124,6 +124,20 @@ body::after {
   border: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
 }
 
+button,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+:where(a, button, input, select, textarea, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 2px solid var(--mood-accent-glow);
+  outline-offset: 2px;
+}
+
 .skip-link {
   position: fixed;
   left: 0.5rem;
@@ -143,6 +157,10 @@ body::after {
 }
 
 /* 滚动条美化 (沿用项目原风格 + 适配主题) */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--border-color) 80%, transparent) transparent;
+}
 .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb {
@@ -151,4 +169,15 @@ body::after {
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: var(--mood-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
