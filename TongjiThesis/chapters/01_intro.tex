@@ -1,0 +1,33 @@
+\chapter{绪论}\label{chap:introduction}
+
+\section{项目背景与研究意义}
+
+音乐是日常生活中最常见的情绪调节工具之一。无论是通勤、学习、运动还是入睡前，许多人都会借助音乐进入特定的心理状态。已有研究指出，音乐能够通过愉悦度（valence）与唤醒度（arousal）两个维度影响个体的情绪状态\cite{russell1980circumplex}，这也使「音乐 $\leftrightarrow$ 情绪」之间的映射成为人机交互（Human--Computer Interaction，HCI）研究的重要方向。
+
+主流商业音乐服务（如 Spotify、网易云音乐等）已经发展出较为成熟的协同过滤与基于历史播放偏好的推荐算法\cite{ricci2015recommender}，但是这类系统通常以「我过去喜欢什么」作为最强的信号源。当用户的情绪状态发生显著变化时（如临近考试焦虑、深夜低落、运动后亢奋），仅靠长期偏好难以即时回应。此外，云端推荐天然依赖联网，并且无法兼顾用户对本地音乐库的个性化使用诉求。
+
+\section{现有方法存在的不足}
+
+围绕「为用户播放合适的音乐」这一目标，目前的方案主要存在以下三方面不足：
+
+\begin{enumerate}
+  \item \textbf{忽视即时情绪。}~推荐结果以累积偏好为主，缺乏对「此刻」状态的感知，用户仍需付出可观的找歌成本。
+  \item \textbf{交互通道单一。}~多数系统仅接受「点击/搜索」这一种显式输入；摄像头、自然语言、时段、手势等情境信号被广泛忽略。
+  \item \textbf{隐私边界模糊与可解释性弱。}~情绪、面部、行为数据多被上传到云端进行集中分析，用户既难以理解推荐的依据，也难以判断个人数据的去向。
+\end{enumerate}
+
+\section{课程设计目标}
+
+针对上述不足，本课程设计提出并实现了一个面向\emph{本地音乐库}的情绪感知电台 \mbox{Mood Radio}，其总体目标可以归纳为：
+
+\begin{itemize}
+  \item \textbf{多模态情绪感知}：通过摄像头表情、手动选择、自然语言聊天、时段电台与头部手势 5 种通道捕获用户当下状态。
+  \item \textbf{统一情绪表示}：借助 Russell 提出的 Valence--Arousal 二维情绪模型\cite{russell1980circumplex}，把「人的情绪」与「音乐的情绪」放进同一坐标空间。
+  \item \textbf{可解释推荐}：在 SQL 层完成复合打分，并对外暴露评分明细（情绪距离、用户反馈、新鲜度、最近播放惩罚），让推荐过程对用户透明可见。
+  \item \textbf{沉浸式视觉反馈}：让页面色调、流动背景、播放器封面随当前情绪柔和变化，强化「系统正在理解我」的感受。
+  \item \textbf{隐私优先}：摄像头与本地音乐均不上传，LLM API Key 仅存放于浏览器，群体在场页面采用匿名聚合并设置隐私门槛。
+\end{itemize}
+
+\section{报告组织结构}
+
+本报告共分 8 章。\cref{chap:introduction}（即本章）介绍项目背景、动机与目标；\cref{chap:requirement} 给出用户研究、Persona、需求说明书与设计原则；\cref{chap:design} 自顶向下描述系统总体架构、数据模型与接口设计；\cref{chap:task-flow} 围绕用户任务一览、行为/顺序/情节分析与交互结构图展开任务分析与交互流程设计；\cref{chap:interface} 逐页给出交互界面设计与所运用的 HCI 知识点；\cref{chap:implementation} 重点讨论 V/A 情绪建模、多通道输入融合、复合打分推荐与 LLM 子进程代理等关键功能的实现；\cref{chap:evaluation} 给出可用性评估、用户满意度问卷与在线/离线运行方式；\cref{chap:conclusion} 总结本课程设计的工作并讨论局限与未来工作。

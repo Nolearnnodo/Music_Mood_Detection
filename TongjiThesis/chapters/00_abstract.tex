@@ -1,0 +1,15 @@
+\MakeAbstract{
+    传统音乐推荐系统多以历史播放偏好为核心信号，往往难以感知用户「此刻」的情绪状态，导致用户在情绪起伏时仍需付出较高的找歌成本。本课程设计以「面向情绪感知的本地音乐电台」为目标，设计并实现了一个名为 Mood Radio 的人机交互系统，将用户当前情绪作为推荐管线的一等输入，结合本地音乐库的情绪坐标完成实时推荐。
+
+    系统以 Russell 提出的 Valence--Arousal 二维情绪模型为公共语义空间，统一接入摄像头表情识别、手动情绪选择、自然语言聊天、时段电台与头部手势五种输入通道；推荐管线在 SQL 层完成基于情绪距离、用户反馈、新鲜度与最近播放时间的复合打分。视觉层提供 7 套情绪主题、Aurora 流动背景与黑胶旋转封面，使整个界面随当前情绪柔和变化，强化"系统正在理解我"的反馈感。系统进一步引入匿名用户标识与心跳聚合，实现了一个隐私友好的"群体此刻"模块。
+
+    工程实现采用 C++17 + cpp-httplib 后端、React + Vite + TailwindCSS 前端与 SQLite 持久层，并通过 onnxruntime + librosa 离线脚本完成歌曲情绪标注。课堂模拟评估表明，用户对本地隐私设计认可度较高，推荐逻辑可解释性良好，匹配/安抚双策略受到普遍欢迎。本项目较为完整地体现了多模态输入、情境感知、用户控制、可解释性与隐私保护等人机交互核心原则。
+}{情绪感知，多模态交互，音乐推荐，可解释性，隐私保护}
+
+\MakeAbstractEng{
+    Most music recommenders rely on long-term listening history and rarely reason about the user's \emph{current} emotional state, leaving users with significant search cost when their mood shifts. This course project designs and implements \emph{Mood Radio}, an emotion-aware local music radio that takes the user's current mood as a first-class input to the recommendation pipeline and serves songs from the user's own library in real time.
+
+    The system adopts Russell's two-dimensional Valence--Arousal model as a shared semantic space. Five input channels --- camera-based facial expression, manual selection, natural-language chat, time-of-day radio and head gesture --- are unified into one target coordinate. The recommendation pipeline performs composite scoring inside SQL, combining emotion distance, explicit feedback, novelty and a temporal penalty against recently played tracks. The visual layer comprises seven mood themes, an aurora-like flowing backdrop and a spinning vinyl cover, all of which morph softly with the current mood to reinforce the sense that "the system understands me". An anonymous identity layer and a heartbeat aggregator further provide a privacy-respecting "collective presence" view.
+
+    The system is built on a C++17 backend (cpp-httplib), a React + Vite + TailwindCSS frontend, an SQLite store, and an onnxruntime + librosa offline script for song-level mood labelling. A small classroom evaluation suggests that the local-first privacy design is well received, the recommendation reasoning is easy to understand, and the dual match/comfort strategy is generally welcomed. The project illustrates how multimodal input, context-awareness, user control, explainability and privacy preservation can be combined in a single end-user HCI artefact.
+}{Emotion-aware computing, Multimodal interaction, Music recommendation, Explainability, Privacy}

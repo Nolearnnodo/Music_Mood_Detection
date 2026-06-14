@@ -1,0 +1,57 @@
+\documentclass[
+  oneside,
+  degree=bachelor,
+  field=science,
+  fullwidthstop=circle,
+  fontset=fandol,
+  times=false,
+  minted=false,
+  biblatex=true,
+  algo=algpseudocode,
+]{tongjithesis}
+
+\tjbibresource{bib/note.bib}
+
+% ============================================================
+%  课程设计定制：标题/页眉 + 取消装订线 + 页面居中
+% ============================================================
+\renewcommand{\tjcovertext}{人机交互导论课程设计报告}
+\renewcommand{\tjheadertext}{人机交互导论课程设计报告}
+\geometry{left=2.55cm, right=2.55cm}
+
+\begin{document}
+
+\input{chapters/metadata}
+\MakeCover
+\cleardoublepage
+\MakeInfoPage
+\cleardoublepage
+% MakeCover / MakeInfoPage 会在结尾把 \tjbindinglinetrue 设回；
+% 在此处再关一次，使正文不再渲染左侧「装订线」竖条。
+\global\tjbindinglinefalse
+
+\frontmatter
+\input{chapters/00_abstract}
+
+\clearpage
+\tableofcontents
+% \listoffigures   % 插图清单（根据需要取消注释）
+% \listoftables    % 表格清单（根据需要取消注释）
+\cleardoublepage
+
+\mainmatter
+\input{chapters/01_intro}
+\input{chapters/02_requirement}
+\input{chapters/03_design}
+\input{chapters/04_task_flow}
+\input{chapters/05_interface}
+\input{chapters/06_implementation}
+\input{chapters/07_evaluation}
+\input{chapters/08_conclusion}
+
+\makereferences
+
+\appendix
+\input{chapters/appendix}
+
+\end{document}

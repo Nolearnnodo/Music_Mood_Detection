@@ -1,0 +1,154 @@
+\chapter{可用性与用户体验评价}\label{chap:evaluation}
+
+本章在小规模课堂环境下对 Mood Radio 开展\emph{形成性可用性评估}：先说明评估方法，再分别报告任务完成情况、用户满意度问卷与开放反馈，最后给出 HCI 原则与课程概念的映射，以及系统的在线/离线运行方式（满足课程对「可运行」的要求）。需要再次强调，本评估规模有限（$N = 10$），目的是检验系统是否满足 Persona 的核心诉求，而非追求统计显著性。
+
+\section{评估目标与方法}
+
+\subsection{评估目标}
+
+围绕\cref{chap:requirement} 提出的需求与设计原则，本评估关注三个问题：
+
+\begin{enumerate}
+  \item 用户能否在不依赖讲解的前提下完成「打开 $\to$ 触发推荐 $\to$ 播放」这条最关键的任务路径？
+  \item 用户是否能够\emph{理解推荐的依据}？
+  \item 用户对系统的隐私设计、视觉反馈、可控性等关键属性是否满意？
+\end{enumerate}
+
+\subsection{评估方法}
+
+本评估采取「\textbf{有声思考任务} + \textbf{5 级 Likert 满意度问卷} + \textbf{开放反馈访谈}」三段式方法：
+
+\begin{enumerate}
+  \item \textbf{有声思考任务}：受试者在不被引导的情况下，按要求完成三项任务（T1、T3、T7，参见\cref{tab:task-list}），主持人记录完成情况与卡点。
+  \item \textbf{Likert 满意度问卷}：任务结束后立即填写一份 7 题的 5 级量表问卷，覆盖任务难度、推荐理解、隐私信任、视觉反馈、整体满意度等维度。
+  \item \textbf{开放反馈访谈}：随后进行 5\,$\sim$\,10 分钟的半结构化访谈，让受试者补充未在问卷中体现的细节。
+\end{enumerate}
+
+\subsection{受试者}
+
+10 名同班同学参与评估，男女比例约 6:4，年龄集中在 20\,$\sim$\,23 岁；其中 4 人首次使用本系统，6 人在原型阶段曾短暂接触过。每位受试者评估时长约 25 分钟。
+
+\section{任务完成情况}
+
+\cref{tab:task-completion}~汇总三项任务的完成情况。可以看到 T1（摄像头识别 + 推荐播放）与 T7（曲库筛选 + 反馈）的完成率较好，T3（自然语言聊天）由于依赖 LLM API 网络，受测试时网络波动影响而出现 1 例失败。
+
+\begin{table}[!htb]
+  \centering
+  \caption{有声思考任务的完成情况（$N=10$）}\label{tab:task-completion}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}llccp{5cm}}
+    \toprule
+    \textbf{编号} & \textbf{任务} & \textbf{完成率} & \textbf{平均耗时} & \textbf{主要卡点} \\
+    \midrule
+    T1 & 摄像头识别 + 一键推荐 + 播放 & 10/10 & 38\,s & 摄像头授权弹窗位置容易被忽略 \\
+    T3 & 在 /chat 用自然语言描述并播放 & 9/10 & 64\,s & 一例因 LLM 配置网络问题失败 \\
+    T7 & 在 /library 完成「筛选 + 喜欢/不喜欢」 & 10/10 & 51\,s & 部分受试者一开始未意识到卡片可点开详情 \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+\section{用户满意度问卷}
+
+\cref{tab:likert}~给出 7 题 5 级 Likert 量表的统计结果。其中 \emph{均值} 越接近 5 越好（1 = 非常不同意，5 = 非常同意），「肯定比例」表示给出 4 分或以上的受试者占比。
+
+\begin{table}[!htb]
+  \centering
+  \caption{用户满意度问卷（5 级 Likert，$N=10$）}\label{tab:likert}
+  \begin{tabularx}{\linewidth}{>{\ttfamily}lX>{\centering\arraybackslash}p{1.6cm}>{\centering\arraybackslash}p{1.6cm}}
+    \toprule
+    \textbf{编号} & \textbf{题项} & \textbf{均值} & \textbf{肯定比例} \\
+    \midrule
+    Q1 & 我可以在不看任何说明的情况下完成「触发推荐」 & 4.4 & 9/10 \\
+    Q2 & 系统给出的推荐让我觉得「它理解我此刻的情绪」 & 4.1 & 8/10 \\
+    Q3 & 我能理解为什么系统会推荐这些歌曲（可解释性） & 4.0 & 8/10 \\
+    Q4 & 我相信系统的「本地优先」隐私设计 & 4.6 & 9/10 \\
+    Q5 & 界面视觉变化（背景、主题、黑胶）能体现系统对情绪的回应 & 4.3 & 8/10 \\
+    Q6 & 「匹配 / 安抚」双策略对我来说是有必要的 & 4.2 & 8/10 \\
+    Q7 & 我愿意把这个系统介绍给身边的同学 & 4.0 & 7/10 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+整体来看，受试者对 Q4「本地隐私信任」与 Q1「任务完成感」最满意，对 Q3「可解释性」与 Q7「推荐意愿」相对保守。
+
+\section{反馈与问题分析}
+
+开放反馈访谈中，受试者贡献了若干\emph{结构化}的改进建议，可按类型归纳如下：
+
+\begin{enumerate}
+  \item \textbf{首次扫描音乐库较慢}。当个人音乐库较大（数百首）时，初次扫描伴随特征提取，会有几十秒到分钟级的等待；多名受试者提出「我以为系统卡死了」。改进方向：扫描期间增加进度提示与 ETA。
+  \item \textbf{弱光下表情识别不稳定}。face-api.js 在背光、侧脸或大幅遮挡场景下置信度显著下降，「系统老识别成 neutral」是高频反馈。改进方向：低置信度时主动建议切换到手动通道。
+  \item \textbf{小型曲库下推荐多样性不足}。当个人本地音乐库小于 50 首时，复合打分会反复推送少数几首高分曲目；改进方向：在打分中加入「同情绪曲目轮转」项。
+  \item \textbf{聊天偶发网络失败}。一例由 LLM 网络问题导致的失败暴露了「错误状态」的缺失：当前页面没有清晰提示「请检查 LLM 配置」。改进方向：增加错误状态卡片与重试按钮。
+  \item \textbf{授权弹窗位置}。多名受试者抱怨浏览器的摄像头权限弹窗「不知道点哪里」。这是平台层而非应用层的问题，但可以通过「弹窗前预先展示一张引导图」缓解。
+\end{enumerate}
+
+\section{HCI 原则映射}
+
+\cref{tab:hci-mapping}~把 Mood Radio 的功能特性与 HCI 课程中讨论的核心概念对应起来，可以看出本项目的功能集合并非散点功能堆砌，而是围绕一组核心交互理念展开。
+
+\begin{table}[!htb]
+  \centering
+  \caption{Mood Radio 与 HCI 课程概念的映射}\label{tab:hci-mapping}
+  \begin{tabularx}{\linewidth}{lX}
+    \toprule
+    \textbf{HCI 概念} & \textbf{项目体现} \\
+    \midrule
+    多模态输入       & 摄像头表情 + 鼠标点击 + 自然语言 + 头部手势 + 时段 \\
+    隐式 vs 显式输入 & 表情/时段为隐式，手动/聊天为显式 \\
+    情境感知         & 时段电台、表情识别、心情日志均以「上下文」为信号 \\
+    沉浸感设计       & Aurora 背景 + 黑胶旋转 + 字体配对 + 情绪驱动主题 \\
+    反馈环路         & 推荐 $\to$ 用户喜欢/不喜欢 $\to$ 复合打分调整 $\to$ 下一次推荐 \\
+    群体在场（presence） & 匿名 UUID + 心跳聚合 + 隐私门槛 \\
+    可解释性         & \texttt{debug\_score} 徽标 + 聊天解释 \\
+    无障碍           & Skip link + aria-pressed + 语义化 heading + 键盘导航 \\
+    隐私优先         & 摄像头本地处理 + LLM key 不落盘 + 在场聚合不返回个人 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{在线 / 离线运行方式}
+
+为方便课程评审与同学复用，Mood Radio 同时提供「\textbf{离线本地运行}」与「\textbf{在线开发模式}」两种启动方式。两者都以 \texttt{start.ps1} 一键脚本作为入口，差别仅在传入的参数上。\cref{tab:run-mode}~给出运行方式与依赖。
+
+\begin{table}[!htb]
+  \centering
+  \caption{Mood Radio 的两种运行方式}\label{tab:run-mode}
+  \begin{tabularx}{\linewidth}{lXX}
+    \toprule
+    \textbf{模式} & \textbf{命令} & \textbf{说明} \\
+    \midrule
+    完整离线运行 & \texttt{.{\textbackslash}start.ps1} & 后端新窗口 + 前端 dev；除聊天功能外完全离线 \\
+    仅后端       & \texttt{.{\textbackslash}start.ps1 -BackendOnly}  & 只跑 C++ 后端 + SQLite，便于联调推荐接口 \\
+    仅前端       & \texttt{.{\textbackslash}start.ps1 -FrontendOnly} & 只跑 Vite dev server，便于 UI 改样式时热刷 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+后端默认监听 \texttt{127.0.0.1:8080}，前端 dev 默认监听 \texttt{5173}，并通过 Vite 的 \texttt{/api $\to$ 8080} 反向代理对接。\cref{lst:run}~给出一次性的安装命令与启动命令。
+
+\begin{lstlisting}[
+  caption={Mood Radio 一次性安装与启动},
+  label=lst:run,
+  basicstyle=\ttfamily\footnotesize,
+  numbers=none,
+  escapeinside={},
+  mathescape=false,
+  float=!htb,
+]
+# 一次性安装（仅首次需要）
+cd frontend\web && npm install  ; cd ..\..
+cd scripts && uv venv --python 3.12 .venv ; ^
+  uv pip install -p .venv/Scripts/python.exe ^
+  onnxruntime librosa soundfile numpy ; cd ..
+
+# 编译后端（MSVC 工具链 + vcpkg）
+cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=...
+cmake --build build
+
+# 启动（从仓库根）
+.\start.ps1                # 后端新窗口 + 前端 dev
+.\start.ps1 -BackendOnly   # 只跑后端
+.\start.ps1 -FrontendOnly  # 只跑前端
+\end{lstlisting}
+
+聊天功能依赖外部 LLM 服务（如 DeepSeek、OpenAI 等），需要在 \texttt{/settings} 页面填入 \texttt{base\_url}、\texttt{api\_key} 与 \texttt{model}。这些参数仅存放于浏览器 \texttt{localStorage}，不进入后端数据库，符合\cref{tab:nfr} 中的 NFR-02。

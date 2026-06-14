@@ -1,0 +1,94 @@
+\appendixsection{核心数据流}\label{sec:appendix-flow}
+
+为便于读者了解 Mood Radio 各模块在运行时是如何串联起来的，本附录给出两条典型的端到端数据流。
+
+\appendixsubsection{摄像头识别 $\to$ 推荐 $\to$ 播放}
+
+\begin{lstlisting}[
+  caption={摄像头识别到播放的完整链路（伪流程）},
+  label=lst:flow-camera,
+  basicstyle=\ttfamily\footnotesize,
+  numbers=none,
+  escapeinside={},
+  mathescape=false,
+  float=!htb,
+]
+1. EmotionCamera (face-api.js)
+     -> onEmotion(scores)                              [browser]
+2. AppStateContext.setFaceEmotion(...)
+     -> useStableFaceEmotion (sliding-window stable)
+3. EmotionRadioPanel computes moodTarget
+     -> handleEmotionGenerate({face, target, strategy})
+4. addEmotionLog(...)
+5. <html data-mood="xxx"> -> theme switch
+6. GET /api/playlist/generate?v=&a=&r=&debug_score=true
+     -> WebServer (C++)
+     -> get_playlist_ranked(v, a, r, limit, exclude)
+       -> SQL JOIN play_history + user_feedback
+          WHERE dist^2 <= r^2 AND kind != 'dislike'
+          ORDER BY composite_score DESC
+     -> return tracks[] with score/dist/feedback/last_played
+7. setEmotionPlaylist + setPlaylistRadius
+8. <AudioPlayer src=/api/stream?id=N>  + VinylDisc spinning
+9. onEnded:
+     -> POST /api/play_history {track_id, played_pct: 1.0}
+     -> next track / autoRefresh
+\end{lstlisting}
+
+\appendixsubsection{自然语言聊天链路}
+
+\begin{lstlisting}[
+  caption={LLM 聊天推荐链路（伪流程）},
+  label=lst:flow-chat,
+  basicstyle=\ttfamily\footnotesize,
+  numbers=none,
+  escapeinside={},
+  mathescape=false,
+  float=!htb,
+]
+[browser] /chat 输入 "今天有点焦虑,想听点能让我平静下来的歌"
+   -> POST /api/chat { messages, config: localStorage.llm_config }
+
+[C++] WebServer
+   -> 写 temp_dir/mood_chat_in_<ts>.json
+   -> cmd /c ".venv/python.exe scripts/llm_chat.py <in> <out>"
+
+[Python] llm_chat.py
+   -> 拼 OpenAI 兼容 chat completions request
+   -> system prompt 强制返回 JSON {reply, mood, target}
+   -> POST {base_url}/chat/completions
+   -> 解析 + clamp 字段
+   -> 写 <out>
+
+[C++] 读 <out>, 删 temp, 返回 body
+
+[browser] ChatPage
+   -> mood.label -> setManualEmotion(...)
+   -> <html data-mood> 切换
+   -> target -> /api/playlist/generate
+   -> 展示对话气泡 + 情绪徽标 + 推荐歌单
+\end{lstlisting}
+
+\appendixsection{工程开发规模}\label{sec:appendix-scale}
+
+为给读者一个粗略的工作量参考，\cref{tab:scale} 给出了本课程设计的关键工程指标。
+
+\begin{table}[!htb]
+  \centering
+  \caption{Mood Radio 工程开发规模}\label{tab:scale}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lc}
+    \toprule
+    \textbf{指标} & \textbf{数量} \\
+    \midrule
+    Git commit 数（hyx\_feature 分支） & 15 \\
+    后端 REST API 端点                 & 25+ \\
+    前端页面                           & 8 \\
+    前端组件                           & 14 \\
+    前端 Hook                          & 4 \\
+    SQLite 表                          & 8 \\
+    情绪主题色（含 Light/Dark）        & 7 $\times$ 2 = 14 \\
+    头部手势类型                       & 4 \\
+    Python 离线脚本                    & 4 \\
+    \bottomrule
+  \end{tabular*}
+\end{table}

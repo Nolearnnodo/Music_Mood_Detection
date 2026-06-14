@@ -1,0 +1,222 @@
+\chapter{用户研究与需求分析}\label{chap:requirement}
+
+本章首先介绍课题组围绕「情绪与音乐」开展的用户研究——覆盖问卷调查、情景访谈、焦点小组与单独访谈四种方法——然后据此提炼出目标用户画像、用户需求、需求说明书、需求框图与系统的设计原则。考虑到课程时间与工作量，本研究规模并不追求统计显著性，而旨在为系统的功能边界与交互形态提供依据。
+
+\section{用户研究方法}
+
+\subsection{研究方法概览}
+
+为了从不同维度互相印证用户痛点，本研究采用「量化 + 质化 + 群体 + 个体」的方法组合。\cref{tab:research-methods}~汇总了四种方法的覆盖目的与样本规模。
+
+\begin{table}[!htb]
+  \centering
+  \caption{用户研究方法概览}\label{tab:research-methods}
+  \begin{tabularx}{\linewidth}{lcX}
+    \toprule
+    \textbf{方法} & \textbf{样本量} & \textbf{覆盖目的} \\
+    \midrule
+    问卷调查    & 42 人 & 听歌习惯、情绪调节频率、找歌成本、隐私态度的量化采集 \\
+    情景访谈    & 6 人  & 在用户真实使用环境下观察「为什么打开音乐 App」 \\
+    焦点小组    & 5 人  & 群体讨论「匹配 vs 安抚」、群体在场感的态度边界 \\
+    单独访谈    & 4 人  & 深挖个体的失败案例与隐私担忧 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{问卷调查}
+
+问卷以匿名方式在校内学生群体中投放，共回收 42 份有效问卷。题项覆盖三类问题：（1）日常听音乐场景与情绪调节频率；（2）找歌时的卡点与对推荐的接受度；（3）对面部识别、本地音乐与情绪数据的隐私态度。
+
+\subsection{情景访谈}
+
+情景访谈采用「就地观察 + 半结构化提问」的方式，在 6 位访谈对象的真实使用环境（宿舍、自习室、健身房等）中进行，重点观察用户在「想听歌」与「真的开始播放」之间的全部操作步骤。情景访谈最重要的发现是：在低落或疲倦的情境下，用户更愿意接受「\textbf{被推荐}」，而非「\textbf{自己搜索}」。
+
+\subsection{焦点小组}
+
+5 人焦点小组围绕两个核心议题展开：（1）系统是否应该尝试改变用户情绪？（2）匿名「群体在场」是否会引发被注视的不安？讨论中的代表性观点：
+
+\begin{itemize}
+  \item 「不要假装欢乐——让我先难过一会儿，再慢慢往上拉」；
+  \item 「群体在场可以接受，但只想看到\emph{聚合}的数字，不希望看到具体的人」；
+  \item 「最好可以一键关掉摄像头，不要在我没注意的时候默默开着」。
+\end{itemize}
+
+\subsection{单独访谈}
+
+针对 4 位在问卷中表达出较强隐私顾虑的对象，开展了 30~45 分钟的单独访谈，重点理解他们对「面部数据何时被采集」、「数据存到哪里」、「能否离线运行」的认知边界。访谈强化了「本地优先」这一原则的必要性。
+
+\section{用户研究发现}
+
+\cref{tab:survey}~汇总了问卷调查中四个关键题项的反馈比例。
+
+\begin{table}[!htb]
+  \centering
+  \caption{问卷调查中四个关键题项的反馈比例（$N=42$）}\label{tab:survey}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lc}
+    \toprule
+    \textbf{题项} & \textbf{占比} \\
+    \midrule
+    会根据当下心情主动选择音乐 & 81\,\% \\
+    经常出现「想听歌但不知道听什么」 & 76\,\% \\
+    对将面部/情绪数据上传到云端存在顾虑 & 74\,\% \\
+    希望系统能同时支持「匹配心情」与「安抚心情」两种策略 & 72\,\% \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+综合质化访谈，还可以提炼出三条带情绪色彩的发现：
+
+\begin{itemize}
+  \item 用户希望「\textbf{少操作、快出歌}」——即使在心情低落、不愿动手时，也能在一两步内得到合适的歌单。
+  \item 用户\textbf{反感被强行转换情绪}——「我难过的时候不想被一首假装欢乐的歌打断」是高频原话。
+  \item 用户希望知道「\textbf{为什么是这首歌}」——即便不需要详细解释，至少应该看到推荐的依据。
+\end{itemize}
+
+\section{目标用户画像}
+
+基于上述研究，本节抽取出 Mood Radio 的 3 个核心 Persona。每个 Persona 由「背景、典型场景、核心诉求与对系统的容忍边界」四个角度刻画，作为后续设计决策的「可参照对象」。
+
+\begin{table}[!htb]
+  \centering
+  \caption{Mood Radio 三个核心目标用户画像}\label{tab:persona}
+  \begin{tabularx}{\linewidth}{>{\bfseries}l>{\raggedright\arraybackslash}p{3cm}X}
+    \toprule
+    \textbf{Persona} & \textbf{身份与背景} & \textbf{典型场景与核心诉求} \\
+    \midrule
+    小南（深夜情绪派）
+      & 21 岁，本科生，理工科 &
+      深夜赶完代码、心情起伏大，希望「一打开就有合适的歌」；不愿打字搜索，但乐于开摄像头。\\
+    \addlinespace
+    Aria（隐私敏感型）
+      & 28 岁，独立设计师 &
+      在咖啡馆办公，担心摄像头与情绪上传；坚持「电脑里所有数据都属于自己」；愿意手动选择情绪。\\
+    \addlinespace
+    阿陈（沉浸聆听者）
+      & 24 岁，硕士在读，黑胶爱好者 &
+      重视「视觉 + 听觉 + 物理感」的整体氛围；希望封面、转盘、背景跟着歌曲走；可以接受较多视觉变化。\\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+三个 Persona 在「\emph{是否愿意开摄像头}」、「\emph{是否在意视觉沉浸}」、「\emph{是否关心隐私}」这三个维度上覆盖了相对极端但仍合理的组合，能够约束系统设计对边缘场景的考虑。
+
+\section{用户需求总结}
+
+综合上述方法的发现，本系统面向的核心用户需求可归纳为四点：
+
+\begin{enumerate}
+  \item \textbf{快速地}得到符合\emph{当下}情绪状态的音乐推荐；
+  \item 可以\emph{显式选择}「匹配心情」或「安抚心情」两种回应策略；
+  \item 推荐过程\emph{可观察、可解释}，至少能看到推荐的依据；
+  \item 摄像头与音乐文件等敏感数据\emph{不上传}，群体功能匿名化。
+\end{enumerate}
+
+此外，访谈对象普遍提到「无摄像头/拒绝摄像头」是一种合理的常见使用模式，因此系统必须为情绪输入提供\textbf{多通道冗余}，避免对单一传感器形成强依赖。
+
+\section{需求说明书}
+
+为使后续实现与评估有据可依，本节给出形式化的需求说明书。需求按「功能性需求（FR）」与「非功能性需求（NFR）」两组列出，并标注优先级（H = 高、M = 中、L = 低）。
+
+\begin{table}[!htb]
+  \centering
+  \caption{Mood Radio 功能性需求（节选）}\label{tab:fr}
+  \begin{tabularx}{\linewidth}{>{\ttfamily}l>{\bfseries}cX}
+    \toprule
+    \textbf{编号} & \textbf{优先级} & \textbf{描述} \\
+    \midrule
+    FR-01 & H & 系统应支持扫描本地音乐目录，并对每首歌计算 V/A 情绪坐标 \\
+    FR-02 & H & 用户应能通过摄像头实时识别面部情绪 \\
+    FR-03 & H & 用户应能手动从 7 类情绪标签中选择当前情绪 \\
+    FR-04 & H & 用户应能通过自然语言聊天表达情绪并得到推荐 \\
+    FR-05 & M & 用户应能基于当前时段一键触发推荐 \\
+    FR-06 & M & 用户应能通过头部手势完成切歌等操作 \\
+    FR-07 & H & 系统应在 SQL 层完成基于情绪距离、用户反馈、新鲜度与时间惩罚的复合打分推荐 \\
+    FR-08 & M & 系统应能区分「匹配」与「安抚」两种策略并按此调整目标坐标 \\
+    FR-09 & H & 系统应记录用户的播放历史与喜欢/不喜欢反馈 \\
+    FR-10 & M & 系统应提供匿名群体在场感页面（情绪分布、Top 听单） \\
+    FR-11 & M & 系统应记录用户的心情日志并以日历/堆叠图可视化 \\
+    FR-12 & L & 系统应提供可配置的最近播放排除时长、推荐半径等偏好参数 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{table}[!htb]
+  \centering
+  \caption{Mood Radio 非功能性需求（节选）}\label{tab:nfr}
+  \begin{tabularx}{\linewidth}{>{\ttfamily}l>{\bfseries}cX}
+    \toprule
+    \textbf{编号} & \textbf{优先级} & \textbf{描述} \\
+    \midrule
+    NFR-01 & H & 摄像头画面与本地音乐文件均\emph{不}上传至云端 \\
+    NFR-02 & H & LLM 的 API Key 不写入数据库或后端日志，仅存放于浏览器 \\
+    NFR-03 & H & 推荐响应时间 $\leq 500$\,ms（曲库 $\leq 200$ 首时） \\
+    NFR-04 & M & 系统支持完全离线运行（聊天功能除外） \\
+    NFR-05 & M & 系统视觉应随当前情绪柔和变化，过渡时长 $\geq 400$\,ms 以避免突变 \\
+    NFR-06 & M & 群体在场页面的隐私门槛可配置（默认 $N=1$，可设为 $\geq 3$） \\
+    NFR-07 & L & 主要交互应可通过键盘完成（Skip link、aria 标签） \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\section{需求框图}
+
+\cref{fig:req-diagram}~给出本系统的需求层级框图：以「情绪感知音乐电台」为根，分别派生「情绪输入」、「音乐情绪建模」、「推荐与反馈」、「视觉沉浸」、「群体在场」、「隐私保护」六个一级模块；每个一级模块下挂载具体的子需求。该框图与上一节的 FR/NFR 一一对应，作为后续章节的功能索引。
+
+\begin{figure}[!htb]
+  \centering
+  \begin{tikzpicture}[
+      every node/.style={font=\small},
+      root/.style={draw, rounded corners=2pt, align=center,
+        inner sep=4pt, fill=orange!15, font=\small\bfseries},
+      mod/.style={draw, rounded corners=2pt, align=left,
+        inner sep=3pt, fill=blue!8, text width=3.2cm, minimum height=0.7cm},
+      leaf/.style={draw, rounded corners=2pt, align=left,
+        inner sep=3pt, fill=gray!8, font=\scriptsize, text width=3.0cm, minimum height=0.55cm},
+    ]
+    \node[root] (r) at (0, 0) {Mood Radio \\ 情绪感知音乐电台};
+
+    \node[mod] (m1) at (4.5,  3.2) {情绪输入 \\ \scriptsize FR-02$\sim$06};
+    \node[mod] (m2) at (4.5,  1.8) {音乐情绪建模 \\ \scriptsize FR-01};
+    \node[mod] (m3) at (4.5,  0.4) {推荐与反馈 \\ \scriptsize FR-07/08/09};
+    \node[mod] (m4) at (4.5, -1.0) {视觉沉浸 \\ \scriptsize NFR-05};
+    \node[mod] (m5) at (4.5, -2.4) {群体在场 \\ \scriptsize FR-10, NFR-06};
+    \node[mod] (m6) at (4.5, -3.8) {隐私保护 \\ \scriptsize NFR-01/02};
+
+    \node[leaf] (l1) at (9.5,  4.4) {摄像头 / 手动};
+    \node[leaf] (l2) at (9.5,  3.4) {聊天 / 时段 / 手势};
+    \node[leaf] (l3) at (9.5,  1.8) {扫描 + V/A 标注};
+    \node[leaf] (l4) at (9.5,  0.4) {复合打分 + 反馈};
+    \node[leaf] (l5) at (9.5, -1.0) {主题 / Aurora / 黑胶};
+    \node[leaf] (l6) at (9.5, -2.4) {匿名身份 + 聚合};
+    \node[leaf] (l7) at (9.5, -3.8) {本地推理 + Key 不落盘};
+
+    \foreach \dst in {m1, m2, m3, m4, m5, m6} \draw[-, thick] (r) -- (\dst);
+    \draw[-] (m1) -- (l1); \draw[-] (m1) -- (l2);
+    \draw[-] (m2) -- (l3); \draw[-] (m3) -- (l4);
+    \draw[-] (m4) -- (l5); \draw[-] (m5) -- (l6);
+    \draw[-] (m6) -- (l7);
+  \end{tikzpicture}
+  \caption{需求框图：以六个模块组织 FR/NFR}\label{fig:req-diagram}
+\end{figure}
+
+\section{设计原则}
+
+围绕上述用户研究与需求，本系统确立了五条贯穿全局的设计原则，如\cref{tab:principle}~所示。这些原则不仅指导功能取舍，也是后续章节交互细节的依据。
+
+\begin{table}[!htb]
+  \centering
+  \caption{Mood Radio 的五条设计原则}\label{tab:principle}
+  \begin{tabularx}{\linewidth}{lX}
+    \toprule
+    \textbf{原则} & \textbf{含义与落地方向} \\
+    \midrule
+    低负担输入 & 优先支持「一眼一击」即可触发推荐，多模态通道互补，避免任一通道失效就完全无法使用 \\
+    用户可控 & 关键开关（自动续推、匹配/安抚、摄像头开关、最近播放排除时长）暴露在显著位置 \\
+    可解释 & 通过情绪图谱、推荐徽标与调试评分等方式向用户解释「为什么推这一首」 \\
+    本地优先 & 摄像头与音乐文件均不上传，LLM 密钥只存浏览器，群体页面采用聚合 \\
+    沉浸感与一致性 & 视觉、声音、文字三个层面共同响应同一情绪标签，避免反馈冲突 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+值得指出的是，「沉浸感」并非纯粹的审美追求。从 HCI 的角度看，让用户在视觉层面持续感受到系统对其情绪的「跟随」，能够显著减少其对识别准确度的焦虑，提高对推荐结果的接受度；这与文献中关于反馈一致性对用户信任的影响相吻合\cite{shneiderman2016designing}。

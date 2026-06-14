@@ -1,0 +1,212 @@
+\chapter{交互界面与视觉设计}\label{chap:interface}
+
+本章把上一章「任务 $\to$ 交互流程 $\to$ 结构」的抽象层进一步落到\emph{具体界面}：首先给出视觉系统总览，然后按 8 个核心页面逐一给出布局说明、关键交互细节以及所运用的 HCI 知识点。每个页面的实际运行截图见相应位置；本节插图位置已为截图预留，截图将以本节图号引用。
+
+\section{视觉系统总览}
+
+\subsection{情绪主题（Mood Theme）}
+
+系统配置了 7 套情绪主题色 $\times$ Light/Dark 两套基底，共计 14 套配色，通过给 \verb|<html>| 节点的 \texttt{data-mood} 属性赋值进行切换。如\cref{tab:mood-theme} 所示，每套主题都根据情绪心理学常识进行选色：愤怒情绪刻意避开「大红」以免压抑，焦虑情绪选用中性灰避免再度刺激，从而把视觉层也纳入「不强行改变用户情绪」的伦理边界。
+
+\begin{table}[!htb]
+  \centering
+  \caption{7 套情绪主题（Dark 模式强调色）}\label{tab:mood-theme}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lll}
+    \toprule
+    \textbf{主题} & \textbf{强调色} & \textbf{适用情绪} \\
+    \midrule
+    happy     & \#fbbf24 琥珀     & 开心、兴奋 \\
+    calm      & \#2dd4bf 青绿     & 平静、专注、中性 \\
+    sad       & \#818cf8 靛紫     & 低落、疲惫 \\
+    anxious   & \#cbd5e1 中性灰   & 焦虑（避免高刺激） \\
+    angry     & \#fda4af 玫粉     & 愤怒（避免大红压抑） \\
+    focused   & \#34d399 翡翠     & 工作、深度思考 \\
+    energetic & \#f472b6 亮粉     & 派对、高能 \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+主题切换基于 CSS 自定义属性配合 500\,ms 过渡完成，避免颜色突变造成的视觉刺激。
+
+\subsection{Aurora 流动背景与黑胶旋转封面}
+
+为强化「系统正在跟随我」的感受，背景层使用两个 85\,vw 大小的径向渐变色块作为 \verb|body::before|/\verb|::after|，应用 80\,px 模糊后以 22\,s / 26\,s 两个略有差异的周期缓慢飘动。色彩 stop 跟随当前主题，让屏幕下方始终缓慢流动着一团对应情绪的「光晕」。
+
+播放器层引入 \texttt{VinylDisc} 组件：SVG 绘制的 10 圈凹槽 + 反射高光，中央放置正方形封面贴纸，并以 7\,s 的线性 \texttt{vinyl-spin} 关键帧旋转。\textbf{旋转动画仅在播放时启用}——这是一个细节但有效的反馈：用户能在余光中识别系统是否在播放，而不需要再回看播放控制条。
+
+\subsection{封面沉浸背景与玻璃质感}
+
+\texttt{CoverBackdrop} 组件在切歌时把封面经过 \texttt{blur(22px) saturate(1.4) brightness(0.7)} 与黑色渐变蒙版处理后铺满整页背景，跨曲交叉淡入 1.2\,s。在此之上，所有卡片均统一应用 \texttt{.glass} 工具类，使用 \texttt{backdrop-filter: blur(14px)}，让 Aurora 与封面背景能够透过，形成「玻璃悬浮于光晕之上」的整体视觉语言。
+
+\section{主界面详细设计}
+
+下面按 8 个页面依次给出布局描述与所运用的 HCI 知识点。每个页面下方列出 3$\sim$5 条 HCI 知识点，对应课程中讨论的核心交互原则——这是本章的「给分点」。
+
+\subsection{\texttt{/radio}：首页电台}
+
+\subsubsection{布局}
+
+页面分为三个纵向带：顶部 TopNav（导航 + 主题切换 + 个人徽章），中部为情绪输入面板（左：摄像头预览 + 稳定徽标；中：7 选 1 手动按钮；右：时段卡片 + 自动续推开关），下部为推荐结果区（歌单列表，每条携带 \emph{喜欢/新鲜/最近} 三类徽标）。右下角全程驻留 GlobalPlayer。\cref{fig:radio}~给出该页面的运行截图位置。
+
+\begin{figure}[!htb]
+  \centering
+  \fbox{\rule{0pt}{6cm}\hspace{12.5cm}}
+  \caption{\texttt{/radio} 页面运行截图（\textit{待嵌入}）}\label{fig:radio}
+\end{figure}
+
+\subsubsection{运用的 HCI 知识点}
+
+\begin{itemize}
+  \item \textbf{多模态冗余}：摄像头、手动、时段三种通道在同一屏内\emph{平等}呈现，用户可按当下偏好选用任一通道。
+  \item \textbf{显式 vs 隐式输入}：「7 选 1」按钮为显式，摄像头与时段为隐式；二者通过\emph{统一徽标}融合反馈。
+  \item \textbf{用户可控}：「匹配 / 安抚」开关与「自动续推」开关暴露在显著位置，符合可见可控原则。
+  \item \textbf{即时反馈}：摄像头稳定后立即亮起徽标；推荐返回后页面主题色与背景同步切换。
+  \item \textbf{可解释性}：推荐列表的徽标对应\cref{sec:reco} 中的复合打分项，让算法对用户透明。
+\end{itemize}
+
+\subsection{\texttt{/chat}：LLM 聊天推荐}
+
+\subsubsection{布局}
+
+经典的对话式 UI：左侧或上方为消息流（用户气泡 + 助手气泡），下方为输入框 + 发送按钮。助手回复气泡中除了文本，还会附带「识别到的情绪徽标」与「一键播放」按钮——LLM 输出的 \texttt{mood} 与 \texttt{target} 直接转换为推荐参数。\cref{fig:chat}~为运行截图位置。
+
+\begin{figure}[!htb]
+  \centering
+  \fbox{\rule{0pt}{5.5cm}\hspace{12.5cm}}
+  \caption{\texttt{/chat} 页面运行截图（\textit{待嵌入}）}\label{fig:chat}
+\end{figure}
+
+\subsubsection{运用的 HCI 知识点}
+
+\begin{itemize}
+  \item \textbf{自然语言交互}：用户可用任意句式描述情绪，降低输入门槛。
+  \item \textbf{受控对话}：通过 system prompt 强制 LLM 返回结构化 JSON，避免无法落地为操作的「闲聊」。
+  \item \textbf{可解释}：助手气泡中显式展示「我识别到你是 X 情绪，所以推荐这些歌」。
+  \item \textbf{隐私边界}：API Key 在浏览器配置，不上传后端日志，并在首次使用时弹出隐私说明。
+\end{itemize}
+
+\subsection{\texttt{/library}：曲库管理}
+
+\subsubsection{布局}
+
+页面顶部是「四象限筛选 + 关键词搜索 + 排序」工具条；中部是网格化曲目卡片（每张卡片以封面为底，叠加歌曲名与 V/A 标签）；点击任意一张卡片打开右侧详情面板（黑胶预览 + 重新分析 + 删除 + 喜欢/不喜欢按钮）。
+
+\begin{figure}[!htb]
+  \centering
+  \fbox{\rule{0pt}{6cm}\hspace{12.5cm}}
+  \caption{\texttt{/library} 页面运行截图（\textit{待嵌入}）}\label{fig:library}
+\end{figure}
+
+\subsubsection{运用的 HCI 知识点}
+
+\begin{itemize}
+  \item \textbf{多视图协调}：四象限筛选与详情面板共享同一选择状态，符合 MVC 与 master--detail 模式。
+  \item \textbf{容错}：删除前弹出二次确认；「重新分析」是\emph{可重复}的非破坏操作。
+  \item \textbf{Fitt 定律}：高频按钮（喜欢/不喜欢）放在详情面板的固定位置且尺寸较大，缩短鼠标移动成本。
+  \item \textbf{可解释}：V/A 标签直接显示在卡片上，使用户能把推荐结果与曲库属性对上号。
+\end{itemize}
+
+\subsection{\texttt{/upload}：拖拽上传}
+
+\subsubsection{布局}
+
+整页以一个大尺寸的虚线框为主，提示「拖拽音频文件到此处」；文件加入后变为带进度条的列表，每条文件在分析完成后变为绿色对勾。底部固定提示「分析在本地完成，文件不上传」。
+
+\begin{figure}[!htb]
+  \centering
+  \fbox{\rule{0pt}{5cm}\hspace{12.5cm}}
+  \caption{\texttt{/upload} 页面运行截图（\textit{待嵌入}）}\label{fig:upload}
+\end{figure}
+
+\subsubsection{运用的 HCI 知识点}
+
+\begin{itemize}
+  \item \textbf{Affordance}：大虚线框以视觉「容器」隐喻暗示可拖入文件。
+  \item \textbf{进度反馈}：每个文件单独有进度条，符合 Nielsen「系统状态可见」启发式。
+  \item \textbf{隐私沟通}：底部一行小字「文件不上传」直接打消「拖文件 = 上传」的常见误解。
+\end{itemize}
+
+\subsection{\texttt{/mood}：情绪图谱}
+
+\subsubsection{布局}
+
+主体是基于 Chart.js 的 V/A 散点图，X 轴 Valence、Y 轴 Arousal、点的颜色按情绪聚类分色；用户可单击散点试听、双击直接加入歌单；右侧抽屉展示当前选中的曲目轨迹动画（歌曲在 30 段窗口内的 V/A 漂移）。
+
+\begin{figure}[!htb]
+  \centering
+  \fbox{\rule{0pt}{6cm}\hspace{12.5cm}}
+  \caption{\texttt{/mood} 页面运行截图（\textit{待嵌入}）}\label{fig:mood}
+\end{figure}
+
+\subsubsection{运用的 HCI 知识点}
+
+\begin{itemize}
+  \item \textbf{信息可视化}：二维散点图把抽象的 V/A 数值转化为可直接感知的「位置」。
+  \item \textbf{直接操纵}：用户可在图上直接圈选歌曲，避免「先列表筛选再添加」的间接步骤。
+  \item \textbf{对应一致性}：图上的颜色与\cref{tab:mood-theme} 主题色对齐，与全局视觉语言一致。
+  \item \textbf{探索式交互}：单击试听、双击加入歌单，符合「探索 + 确认」的双层操作模式。
+\end{itemize}
+
+\subsection{\texttt{/journal}：心情日志}
+
+\subsubsection{布局}
+
+顶部为「过去 90 天」的日历视图（每日格子按当天主情绪着色，未记录的日子为浅灰）；中部为「过去 7 天」按情绪类别堆叠的柱状图；底部是按时间倒序的详细日志列表，每条携带情绪、来源、策略与坐标。
+
+\begin{figure}[!htb]
+  \centering
+  \fbox{\rule{0pt}{6cm}\hspace{12.5cm}}
+  \caption{\texttt{/journal} 页面运行截图（\textit{待嵌入}）}\label{fig:journal}
+\end{figure}
+
+\subsubsection{运用的 HCI 知识点}
+
+\begin{itemize}
+  \item \textbf{时间尺度切换}：90 天日历用于「俯视」，7 天柱状图用于「近期回顾」，列表用于「细节查询」，覆盖不同决策需要。
+  \item \textbf{反思型设计}：日志的本意不是评分用户，而是让用户「自我观察」，与 reflective HCI 主张一致。
+  \item \textbf{隐私}：日志保存在浏览器本地存储，不进入服务端数据库。
+\end{itemize}
+
+\subsection{\texttt{/community}：群体此刻}
+
+\subsubsection{布局}
+
+顶部一行大字展示「现在 N 人在线」；中部是按情绪分类的横向条形图；下方是「Top 听单」列表（带听众数与隐私门槛说明）。\textbf{所有数据都是聚合后的统计量}，不展示具体用户。
+
+\begin{figure}[!htb]
+  \centering
+  \fbox{\rule{0pt}{5.5cm}\hspace{12.5cm}}
+  \caption{\texttt{/community} 页面运行截图（\textit{待嵌入}）}\label{fig:community}
+\end{figure}
+
+\subsubsection{运用的 HCI 知识点}
+
+\begin{itemize}
+  \item \textbf{弱社交陪伴}：仅展示聚合数字，避免「被注视」与「社交压力」。
+  \item \textbf{隐私门槛}：当某曲听众数低于 $N$ 时不显示，避免反推个人偏好。
+  \item \textbf{延迟一致性}：通过文案明示「数据更新约 1 分钟」，把异步聚合的延迟显式化。
+\end{itemize}
+
+\subsection{\texttt{/settings}：偏好与隐私}
+
+\subsubsection{布局}
+
+按「监控目录、推荐偏好滑杆、LLM 配置、隐私与数据」四块分区。每块均使用一致的卡片布局，关键开关附带「这是什么意思？」的小问号弹出框。
+
+\begin{figure}[!htb]
+  \centering
+  \fbox{\rule{0pt}{6cm}\hspace{12.5cm}}
+  \caption{\texttt{/settings} 页面运行截图（\textit{待嵌入}）}\label{fig:settings}
+\end{figure}
+
+\subsubsection{运用的 HCI 知识点}
+
+\begin{itemize}
+  \item \textbf{分组与可发现性}：四个分区按用户心智组织，方便定位。
+  \item \textbf{帮助即位}：问号弹出框就近解释术语，避免离开当前页查文档。
+  \item \textbf{破坏性操作分离}：「清空播放历史」「重新分析全库」等不可逆操作放置在卡片末尾并要求二次确认。
+\end{itemize}
+
+\section{群体在场感的视觉表达}
+
+\texttt{/community} 页面的横向条形图刻意采用与主页同一套主题色，让用户在群体页面看到的颜色与个人页面保持一致——避免「群体世界另开一种配色」的违和感。条形图采用从左到右淡入的微动画（0.6\,s 一次），既暗示「数据是实时的」，又避免单调静态带来的「死页面」感。

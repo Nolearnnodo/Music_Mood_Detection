@@ -1,0 +1,206 @@
+\chapter{任务分析与交互流程设计}\label{chap:task-flow}
+
+本章把上一章的需求和 Persona 转换为具体的「\textbf{用户做什么}」与「\textbf{系统如何回应}」。先以用户任务一览表给出宏观地图，再分别用使用行为分析、顺序分析与故事讲述/情节分析三种方法刻画典型任务，最后给出页面级的视觉关联跳转图与功能层级上的交互结构图。
+
+\section{用户任务一览}
+
+\cref{tab:task-list}~按「使用频率 $\times$ 关键程度」两个维度列出本系统支持的所有用户任务，并标注每个任务的目标用户（参见\cref{tab:persona}）。
+
+\begin{table}[!htb]
+  \centering
+  \caption{用户任务一览表}\label{tab:task-list}
+  \begin{tabularx}{\linewidth}{>{\ttfamily}lXccl}
+    \toprule
+    \textbf{编号} & \textbf{任务描述} & \textbf{频率} & \textbf{关键} & \textbf{典型 Persona} \\
+    \midrule
+    T1 & 通过摄像头识别情绪 + 一键推荐播放 & 高 & 是 & 小南 \\
+    T2 & 手动从 7 类情绪中选择 + 推荐播放 & 高 & 是 & Aria \\
+    T3 & 在 /chat 中用自然语言描述情绪 + 推荐 & 中 & 是 & 小南 \\
+    T4 & 一键触发当前时段电台         & 中 & 否 & Aria, 阿陈 \\
+    T5 & 在 /mood 二维图上点选歌曲    & 中 & 否 & 阿陈 \\
+    T6 & 上传新的本地音乐文件         & 低 & 否 & 三者均涉及 \\
+    T7 & 在 /library 中四象限筛选/搜索/反馈 & 中 & 否 & 阿陈 \\
+    T8 & 查看 /journal 心情日志       & 低 & 否 & Aria \\
+    T9 & 查看 /community 群体在场     & 低 & 否 & 小南 \\
+    T10 & 在 /settings 中调整偏好     & 低 & 否 & Aria \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+T1, T2, T3 三项是系统最关键的「\emph{快速找歌}」类任务，其交互细节将在后续小节中重点展开。
+
+\section{使用行为分析}
+
+使用行为分析（action analysis）把每个关键任务拆分为「\emph{用户动作}—\emph{系统响应}—\emph{用户感受}」的小单元，便于识别交互摩擦点。\cref{tab:action-t1}~以 T1（摄像头识别 + 一键推荐）为例展开。
+
+\begin{table}[!htb]
+  \centering
+  \caption{T1「摄像头识别 + 一键推荐」的使用行为分析}\label{tab:action-t1}
+  \begin{tabularx}{\linewidth}{>{\ttfamily}lXX}
+    \toprule
+    \textbf{步骤} & \textbf{用户动作 / 系统响应} & \textbf{用户感受 / HCI 设计考虑} \\
+    \midrule
+    A1 & 打开 \texttt{/radio}，看到电台首页与摄像头开关 & 「我现在是不是要点摄像头？」——系统通过文案与图标暗示流程 \\
+    A2 & 点击「开启摄像头」并授权 & 浏览器权限弹窗——一次性、显式授权，符合本地优先 \\
+    A3 & face-api.js 进行本地推理 & 「它好像识别到我了」——置信度条与情绪标签作为反馈 \\
+    A4 & 滑窗稳定 $\geq 1.2$\,s 后亮起「已稳定」徽标 & 避免瞬时表情误触发，给用户时间确认 \\
+    A5 & 用户选择「匹配 / 安抚」策略 & 关键开关显式可见，符合「用户可控」 \\
+    A6 & 点击「一键推荐」 & 「我等多久？」——按钮上立即出现 spinner \\
+    A7 & 系统返回歌单 + 主题色切换 + 背景过渡 & 「它真的换皮肤了」——多通道反馈强化「系统理解我」 \\
+    A8 & 自动播放第一首 + 黑胶旋转 & 黑胶仅在播放时旋转，作为状态副反馈 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+类似地，T2（手动 + 推荐）与 T3（聊天 + 推荐）也能拆出 5--7 步的动作链。值得注意的是，T2 比 T1 少 1$\sim$2 步（无需授权、无需等待稳定），这也是 Aria 这类 Persona 会优先选择手动通道的原因之一。
+
+\section{顺序分析}
+
+顺序分析（sequence analysis）把任务在「\emph{时间维度}」上的事件流可视化，有助于发现等待瓶颈与并行机会。\cref{fig:seq-t1}~给出 T1 的顺序图：浏览器、C++ 后端、SQLite 与 face-api.js 模型在时间轴上的事件交换关系。
+
+\begin{figure}[!htb]
+  \centering
+  \begin{tikzpicture}[
+      every node/.style={font=\small},
+      lane/.style={draw, minimum width=2.8cm, minimum height=0.7cm,
+        rounded corners=2pt, fill=blue!8, font=\small\bfseries},
+      arrow/.style={->, thick, >=stealth, font=\scriptsize},
+      lifeline/.style={dashed, gray},
+    ]
+    % Swim lanes at y = 0
+    \node[lane] (U)  at (0, 0)    {用户};
+    \node[lane] (FE) at (3.6, 0)  {浏览器/face-api};
+    \node[lane] (BE) at (7.4, 0)  {C++ 后端};
+    \node[lane] (DB) at (10.8, 0) {SQLite};
+    % Lifelines
+    \foreach \n in {U, FE, BE, DB} \draw[lifeline] (\n.south) -- ++(0, -7.6);
+    % Messages (use named coordinates at fixed depths)
+    \draw[arrow] (0,-0.8)  -- node[above]{打开 /radio + 授权} (3.6,-0.8);
+    \draw[arrow] (3.6,-1.6) -- ++(0,-0.6) node[midway, right]{\;本地推理};
+    \draw[arrow] (3.6,-2.5) -- node[above]{滑窗稳定 1.2\,s} (0,-2.5);
+    \draw[arrow] (0,-3.3)   -- node[above]{点「一键推荐」} (3.6,-3.3);
+    \draw[arrow] (3.6,-4.1) -- node[above]{GET /api/playlist/generate} (7.4,-4.1);
+    \draw[arrow] (7.4,-4.9) -- node[above]{\scriptsize SQL: dist + 反馈 + 新鲜度 + 时间惩罚} (10.8,-4.9);
+    \draw[arrow] (10.8,-5.7) -- node[above]{tracks[] + score} (7.4,-5.7);
+    \draw[arrow] (7.4,-6.5)  -- node[above]{200 OK} (3.6,-6.5);
+    \draw[arrow] (3.6,-7.3)  -- node[above]{主题切换 + 黑胶旋转} (0,-7.3);
+  \end{tikzpicture}
+  \caption{T1「摄像头识别 + 一键推荐」的顺序图}\label{fig:seq-t1}
+\end{figure}
+
+从顺序图可读出两条关键观察：（1）滑窗稳定阶段是\emph{客户端}本地完成，避免了对网络的依赖；（2）整条链路只有一次后端调用，对带宽与延迟的要求都较低，符合「本地优先」原则。
+
+\section{故事讲述与情节分析}
+
+故事讲述（storytelling）让设计者站在 Persona 的视角描述一次完整的使用体验，从而暴露场景中的微妙摩擦。本节给出 3 个 Scenario，分别对应三个 Persona。
+
+\subsection*{Scenario 1：小南的深夜情绪}
+
+\begin{quote}
+\emph{凌晨一点，小南刚关掉编辑器。他疲倦地往后靠在椅背上，机械地打开 Mood Radio 的 \texttt{/radio} 页面。他没有打字，也没有挪鼠标，只是看了看摄像头——画面上方亮起了「sad，置信 0.78」的徽标。他点了一下「安抚」与「一键推荐」，屏幕背景从冷蓝缓慢变成靛紫，第一首低唤醒的钢琴曲已经在右下角的浮动播放器里转起了黑胶。}
+\end{quote}
+
+\textbf{设计映射}：T1、A1$\sim$A8；策略选择体现「用户可控」；从冷蓝到靛紫的过渡体现「沉浸感与一致性」。
+
+\subsection*{Scenario 2：Aria 的咖啡馆办公}
+
+\begin{quote}
+\emph{周二上午，Aria 在咖啡馆打开笔电准备完成一份提案。她不想开摄像头——身边有人路过。她点开 Mood Radio，跳过摄像头，直接在 \texttt{/radio} 上点了「focused」按钮，再按一下「匹配」与「一键推荐」。系统给出 8 首高 V/A 但偏低唤醒的器乐曲，并在右上角标注「私有，仅本地」。Aria 戴上耳机，开始写她的提案。}
+\end{quote}
+
+\textbf{设计映射}：T2 路径；显式拒绝摄像头的多通道冗余；UI 上的隐私提示标签。
+
+\subsection*{Scenario 3：阿陈的沉浸聆听}
+
+\begin{quote}
+\emph{晚饭后，阿陈关上窗帘，把 Mood Radio 全屏。他在 \texttt{/mood} 的二维情绪图上鼠标拖了一个圈，圈住右下角「高 V 低 A」的歌曲群，按 \texttt{Enter}。屏幕背景换成一张专辑封面经过模糊的暖橙色调，黑胶开始转动，铃声、贝斯、底鼓沿着 7\,s 的旋转节奏铺展开。他坐回沙发，从口袋里掏出他的实体黑胶。}
+\end{quote}
+
+\textbf{设计映射}：T5 + T1 的延伸；情绪图谱与 CoverBackdrop 是「沉浸感」与「可解释」原则的共同体现。
+
+\section{视觉关联关系跳转图}
+
+\cref{fig:nav}~给出页面级的视觉关联关系跳转图：顶部主导航横向连接 6 个常用页面，\texttt{/radio} 与 \texttt{/mood} 之间存在双向跳转（V/A 图与推荐结果可互相驱动），右下角的浮动 Mini Player 在所有页面均可见。
+
+\begin{figure}[!htb]
+  \centering
+  \begin{tikzpicture}[
+      every node/.style={font=\small},
+      page/.style={draw, rounded corners=2pt, align=center,
+        inner sep=4pt, fill=blue!8, minimum width=2.2cm},
+      arrow/.style={->, thick, >=stealth},
+    ]
+    \node[page, fill=orange!20] (radio)   at (0, 2) {\texttt{/radio} \\ \scriptsize 首页电台};
+    \node[page] (chat)    at (3.0, 2)  {\texttt{/chat}};
+    \node[page] (library) at (6.0, 2)  {\texttt{/library}};
+    \node[page] (upload)  at (9.0, 2)  {\texttt{/upload}};
+    \node[page] (mood)    at (0, 0)    {\texttt{/mood}};
+    \node[page] (journal) at (3.0, 0)  {\texttt{/journal}};
+    \node[page] (community) at (6.0, 0) {\texttt{/community}};
+    \node[page] (settings) at (9.0, 0) {\texttt{/settings}};
+
+    % Main nav (top bar — bidirectional)
+    \draw[arrow, <->] (radio) -- (chat);
+    \draw[arrow, <->] (chat)  -- (library);
+    \draw[arrow, <->] (library) -- (upload);
+
+    % Vertical cross links
+    \draw[arrow, <->] (radio.south) -- (mood.north);
+    \draw[arrow] (chat.south) -- (journal.north);
+    \draw[arrow] (library.south) -- (community.north);
+    \draw[arrow] (upload.south) -- (settings.north);
+
+    % Bottom nav
+    \draw[arrow, <->] (mood) -- (journal);
+    \draw[arrow, <->] (journal) -- (community);
+    \draw[arrow, <->] (community) -- (settings);
+
+    % Floating player notice
+    \node[draw=red, dashed, rounded corners=2pt, font=\scriptsize,
+      align=center, fill=red!4, inner sep=3pt] (gp) at (12.0, 1.0)
+      {GlobalPlayer \\ 在所有页面常驻};
+    \draw[->, dashed, red!60] (gp.west) -- ++(-1.4, 0);
+  \end{tikzpicture}
+  \caption{视觉关联关系跳转图（橙色为入口首页）}\label{fig:nav}
+\end{figure}
+
+\section{交互结构图}
+
+交互结构图（interaction structure diagram）按「功能维度」而非「页面维度」组织系统，反映用户在大脑中应该如何理解 Mood Radio。\cref{fig:interaction-structure}~给出本系统的交互结构图：四个一级功能（情绪输入、推荐与播放、个人化与反馈、群体与隐私），下挂具体能力。
+
+\begin{figure}[!htb]
+  \centering
+  \begin{tikzpicture}[
+      every node/.style={font=\small},
+      l1/.style={draw, rounded corners=2pt, align=center,
+        inner sep=4pt, fill=orange!15, font=\small\bfseries,
+        minimum width=2.8cm},
+      l2/.style={draw, rounded corners=2pt, align=center,
+        inner sep=3pt, fill=blue!8, text width=2.6cm, font=\scriptsize, minimum height=0.5cm},
+    ]
+    \node[l1] (a) at (0, 0)  {情绪输入};
+    \node[l1] (b) at (4, 0)  {推荐与播放};
+    \node[l1] (c) at (8, 0)  {个人化与反馈};
+    \node[l1] (d) at (12, 0) {群体与隐私};
+
+    \foreach \i/\name in {1/{摄像头表情}, 2/{手动选择}, 3/{自然语言聊天}, 4/{时段电台}, 5/{头部手势}} {
+      \node[l2] at (0, -0.8 - 0.7*\i) {\name};
+      \draw[-] (a.south) -- (0, -0.5 - 0.7*\i);
+    }
+    \foreach \i/\name in {1/{V/A 距离}, 2/{复合打分}, 3/{自动续推}, 4/{黑胶播放器}} {
+      \node[l2] at (4, -0.8 - 0.7*\i) {\name};
+      \draw[-] (b.south) -- (4, -0.5 - 0.7*\i);
+    }
+    \foreach \i/\name in {1/{喜欢/不喜欢}, 2/{播放历史}, 3/{心情日志}, 4/{偏好滑杆}} {
+      \node[l2] at (8, -0.8 - 0.7*\i) {\name};
+      \draw[-] (c.south) -- (8, -0.5 - 0.7*\i);
+    }
+    \foreach \i/\name in {1/{匿名身份}, 2/{心跳上报}, 3/{聚合在场感}, 4/{隐私门槛}} {
+      \node[l2] at (12, -0.8 - 0.7*\i) {\name};
+      \draw[-] (d.south) -- (12, -0.5 - 0.7*\i);
+    }
+  \end{tikzpicture}
+  \caption{Mood Radio 的交互结构图}\label{fig:interaction-structure}
+\end{figure}
+
+可以看到，\cref{fig:interaction-structure}~中的「情绪输入」一级与「推荐与播放」一级之间存在隐式的「输入 $\to$ 输出」关系；而「个人化与反馈」是这条路径的反向闭环——用户每一次喜欢/不喜欢都会回流到推荐打分；「群体与隐私」则像一条横向带子，把所有功能在 Aria 这类隐私敏感用户面前划出一道明确的边界。

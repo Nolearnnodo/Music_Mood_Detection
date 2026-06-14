@@ -1,0 +1,181 @@
+\chapter{关键功能与算法实现}\label{chap:implementation}
+
+本章选取 Mood Radio 中四个最具代表性的功能模块——V/A 情绪建模、多通道情绪输入融合、复合打分推荐算法以及 LLM 子进程代理——展开实现层面的讨论，并穿插说明工程过程中遇到的关键问题及其解决思路。
+
+\section{V/A 情绪坐标的建模与修复}\label{sec:onnx-fix}
+
+\subsection{二维情绪坐标}
+
+系统沿用 Russell 提出的 Valence--Arousal 二维情绪模型\cite{russell1980circumplex}，将每首歌的情绪表征为一个二维向量 $(v, a) \in [1, 9]^2$。其中 \emph{Valence} 反映「愉悦--不愉悦」轴，\emph{Arousal} 反映「平静--激活」轴。对人脸表情类别（如 happy/sad/angry 等），系统通过一张静态映射表（见\cref{tab:emotion-mapping}）将类别标签转换为坐标，从而把「人」与「音乐」放进同一空间。
+
+\begin{table}[!htb]
+  \centering
+  \caption{面部情绪类别到 V/A 坐标的映射}\label{tab:emotion-mapping}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lcc>{\raggedright\arraybackslash}p{6cm}}
+    \toprule
+    \textbf{情绪标签} & \textbf{Valence} & \textbf{Arousal} & \textbf{说明} \\
+    \midrule
+    happy     & 7.5 & 6.5 & 高愉悦、中等唤醒 \\
+    neutral   & 5.0 & 5.0 & 中性参考点 \\
+    sad       & 3.0 & 3.5 & 低愉悦、低唤醒 \\
+    angry     & 3.5 & 7.5 & 低愉悦、高唤醒 \\
+    fearful   & 3.5 & 6.5 & 偏紧张焦虑 \\
+    disgusted & 3.0 & 5.0 & 低愉悦、中性唤醒 \\
+    surprised & 6.0 & 7.5 & 偏高愉悦、高唤醒 \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+\subsection{距离与回退}
+
+推荐过程的基本几何度量为情绪坐标的欧氏距离：
+\begin{equation}\label{eq:dist}
+  d\bigl((v_i, a_i), (v^\star, a^\star)\bigr) = \sqrt{(v_i - v^\star)^2 + (a_i - a^\star)^2}.
+\end{equation}
+其中 $(v^\star, a^\star)$ 为当前目标坐标，$(v_i, a_i)$ 为曲库中第 $i$ 首歌的情绪坐标。当用户指定半径 $r$ 之内的候选过少时，系统按 $r \rightarrow 1.5r \rightarrow 2.5r \rightarrow 4r$ 的级数自动扩张，避免「无歌可推」的尴尬。这一机制实际上是 HCI 中「容错与优雅降级」原则的直接体现。
+
+\subsection{ncnn 推理失真与离线修复}
+
+最初实现采用 \texttt{ncnn} 在 C++ 端进行 ONNX 模型推理。实测中却发现同一首歌的输出 V/A 落在 $[-135, 138]$ 的异常范围。通过对比三条路径——\TJCircled{1} 原始 C++ 路径，\TJCircled{2} 替换为 \texttt{onnxruntime} 后的 C++ 路径，\TJCircled{3} Python 端使用 \texttt{onnxruntime + librosa} 的离线路径——可以确认问题不在预处理公式，而在 \texttt{ncnn} 的模型转换或推理实现。
+
+为了不阻塞产品演示进度，项目采取了「\textbf{绕过} 而非 \textbf{深挖}」的策略：编写 \texttt{scripts/analyze\_all.py}，在 Python 离线路径上以与训练一致的 \texttt{librosa} 流程重新计算全库 V/A，写回 SQLite。修复后 77 首歌的 V/A 分布如\cref{tab:va-distribution} 所示，分布合理，排序与人工主观判断高度一致（伤心金曲在 V 低端、J-pop 高能在 A 高端等）。
+
+\begin{table}[!htb]
+  \centering
+  \caption{修复后曲库 V/A 分布统计（$N=77$）}\label{tab:va-distribution}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lcccc}
+    \toprule
+    \textbf{维度} & \textbf{最小值} & \textbf{最大值} & \textbf{均值} & \textbf{标准差} \\
+    \midrule
+    Valence & 4.07 & 7.14 & 5.85 & 0.81 \\
+    Arousal & 3.91 & 7.51 & 5.73 & 0.76 \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+\section{多通道情绪输入}
+
+\subsection{统一入口}
+
+五种情绪输入最终都收敛到同一个回调 \texttt{\small handleEmotionGenerate(stableEmotion,\linebreak[1] moodTarget, strategy)}，确保推荐管线与下游视觉更新只需要订阅\emph{一个}事件源。这一设计来源于 HCI 中「单一真理源」（Single Source of Truth）的状态管理理念。\cref{tab:channel}~汇总了 5 种通道的实现方式与输出格式。
+
+\begin{table}[!htb]
+  \centering
+  \caption{多通道情绪输入实现汇总}\label{tab:channel}
+  \begin{tabularx}{\linewidth}{lXX}
+    \toprule
+    \textbf{通道} & \textbf{实现方式} & \textbf{输出格式} \\
+    \midrule
+    摄像头表情     & face-api.js + \texttt{useStableFaceEmotion}（滑窗稳定） & \texttt{\{label, confidence, source\}} \\
+    手动选择       & \texttt{ManualEmotionSelector}（7 个按钮）             & \texttt{\{label, confidence:\,0.99\}} \\
+    自然语言聊天   & LLM 返回结构化 JSON                                    & \texttt{\{mood, target, reply\}} \\
+    时段电台       & \texttt{timeSlot.js}：当前小时 $\to$ 6 时段            & \texttt{\{theme, target\}} \\
+    头部手势       & \texttt{useHeadGesture}（鼻尖关键点滑窗）              & \texttt{swipe\_l/r}, \texttt{shake}, \texttt{nod} \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+策略统一为 \emph{match}（顺应当前心情）或 \emph{comfort}（安抚/反向调节）。后者在数学上等价于把目标坐标向「中性参考点」$(5, 5)$ 拉近一定比例。
+
+\subsection{头部手势的稳健识别}
+
+头部手势是本系统中最容易「误触发」的通道。课题组在实测中观察到两类典型问题：（a）用户挥头到位后回正，会产生反向的 swipe；（b）静坐时小幅晃头偶尔被误识别为 \texttt{shake}。
+
+针对这些问题，本项目设计了如\cref{algo:gesture} 所示的轻量级状态机：用滑窗内\emph{偏离起点的最大幅度} \texttt{peakDx} 判定方向（不要求保持姿势）；引入 1 秒「屏蔽期」吞掉回正帧；并通过总位移、反转次数、峰值幅度三重门槛过滤静坐噪声。适配视频镜像时，仅需翻转方向语义即可。
+
+\begin{algorithm}[!htb]
+  \caption{头部手势识别状态机（简化版）}\label{algo:gesture}
+  \begin{algorithmic}[1]
+    \Require 鼻尖关键点 $(x_t, y_t)$，滑窗长度 $W$，方向阈值 $\theta_d$，
+      反转次数阈值 $\theta_r$，静坐总位移阈值 $\theta_s$，屏蔽时长 $T_b$
+    \Ensure 离散手势 $g \in \{\text{swipe\_left}, \text{swipe\_right}, \text{shake}, \text{nod}, \emptyset\}$
+    \State 维护近 $W$ 帧的坐标缓冲 $B$ 与上次触发时间 $t_{last}$
+    \If{$t - t_{last} < T_b$} \State 清空 $B$；\Return $\emptyset$ \EndIf
+    \State 计算 $\text{peakDx} = \max_t |x_t - x_0|$，$\text{totalPath} = \sum_t |x_t - x_{t-1}|$，反转次数 $r$
+    \If{$\text{totalPath} < \theta_s$} \State \Return $\emptyset$ \Comment{静坐噪声直接放弃} \EndIf
+    \If{$r \geq \theta_r$} \State $t_{last} \gets t$; \Return $\text{shake}$ \EndIf
+    \If{$\text{peakDx} \geq \theta_d$}
+      \State $g \gets$ \textbf{if} $\text{peak}>0$ \textbf{then} \text{swipe\_right} \textbf{else} \text{swipe\_left}
+      \State $t_{last} \gets t$; \Return $g$
+    \EndIf
+    \State \Return $\emptyset$
+  \end{algorithmic}
+\end{algorithm}
+
+\section{复合打分推荐算法}\label{sec:reco}
+
+\subsection{原始 v1 算法}
+
+最初版本的推荐算法直接套用距离与半径过滤：
+\begin{equation}
+  \mathcal{R}_1 = \bigl\{ s_i \mid (v_i - v^\star)^2 + (a_i - a^\star)^2 \leq r^2 \bigr\},
+\end{equation}
+按距离升序取前 $N$ 项。这一形式直观，但与用户反馈、新鲜度无关，容易出现「同一首歌反复推送」的体验问题。
+
+\subsection{v2 复合打分}
+
+为综合反映「想听」、「新鲜」与「最近别再播」三类信号，本课程设计提出了如\cref{eq:score} 所示的复合打分函数，并在 SQL 层一次性完成计算：
+
+\begin{equation}\label{eq:score}
+  \mathrm{score}(s_i) = -d_i^2 + \mathbb{1}[\text{like}] \cdot 1.5 + \mathbb{1}[\text{never}] \cdot 0.4 - \mathrm{recencyPenalty}(s_i),
+\end{equation}
+其中 $d_i$ 为\cref{eq:dist} 定义的距离，$\mathrm{recencyPenalty}(s_i)$ 是关于「最近一次播放距今时长」的分段函数：
+\begin{equation}\label{eq:recency}
+  \mathrm{recencyPenalty}(s_i) = \begin{cases}
+    3.0, & \Delta t \leq 30\ \text{min} \\
+    1.4, & 30\ \text{min} < \Delta t \leq 2\ \text{h} \\
+    0.7, & 2\ \text{h}  < \Delta t \leq 6\ \text{h} \\
+    0.2, & 6\ \text{h}  < \Delta t \leq 24\ \text{h} \\
+    0,   & \text{otherwise}.
+  \end{cases}
+\end{equation}
+
+被显式标记为「不喜欢」的曲目以及用户在 UI 中指定的「最近 $N$ 分钟内播过」的曲目在 SQL 端直接过滤；若打分后候选过少，则按\cref{sec:onnx-fix} 末尾所述的半径回退机制自动放宽。
+
+\subsection{可解释性反馈}
+
+为体现「可解释推荐」的设计原则，系统在 \texttt{/api/playlist/generate} 上增加了 \texttt{debug\_score=true} 参数，开启后每一条返回项都会携带 \verb|{score, dist, feedback, last_played_min_ago}|。前端在推荐列表中以「\textbf{喜欢 / 新鲜 / 最近}」三类徽标的形式向用户解释「为什么是这首」，由此把后端的复合打分通过最小可读单元暴露给终端用户。
+
+\section{LLM 子进程代理与隐私设计}
+
+\subsection{动机：前端配置 + 后端代理}
+
+聊天页面允许用户用自然语言描述当下情绪（如「今天有点焦虑，想听点能让我平静下来的歌」），由 LLM 返回结构化 JSON $\{$\,reply, mood, target\,$\}$。直接在浏览器内发起 LLM 调用会暴露 API Key，存在严重的安全风险；而把 Key 长期存在后端则违背了「本地优先」的隐私原则。
+
+为兼顾安全与隐私，本系统采用「\textbf{前端配置、后端代理}」的折中方案：用户在设置页填入 base\_url / api\_key / model，仅存于 \texttt{localStorage}；前端在调用时把这份配置随请求一起 POST 给后端；后端将配置写入临时 JSON、拉起 Python 子进程完成 LLM 调用，再读出结果回传。Key 既不落盘也不出现在后端日志中。
+
+\subsection{流程实现}
+
+\cref{lst:llm}~给出聊天链路的关键 Python 片段，省略了与本节无关的错误处理。
+
+\begin{lstlisting}[
+  language=Python,
+  caption={LLM 子进程代理的关键实现（节选）},
+  label=lst:llm,
+  basicstyle=\ttfamily\footnotesize,
+  escapeinside={},
+  mathescape=false,
+  float=!htb,
+]
+def chat(in_path: str, out_path: str):
+    cfg = json.load(open(in_path, encoding="utf-8"))
+    body = {
+        "model":    cfg["model"],
+        "messages": SYSTEM_PROMPT + cfg["messages"],
+        "response_format": {"type": "json_object"},
+    }
+    req = urllib.request.Request(
+        cfg["base_url"] + "/chat/completions",
+        data=json.dumps(body).encode("utf-8"),
+        headers={"Authorization": f"Bearer {cfg['api_key']}"},
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read())
+    parsed = json.loads(data["choices"][0]["message"]["content"])
+    parsed["target"] = clamp_target(parsed.get("target"))
+    json.dump(parsed, open(out_path, "w", encoding="utf-8"))
+\end{lstlisting}
+
+\subsection{隐私收益}
+
+由该方案带来的隐私收益主要有三：（1）API Key 仅存放于浏览器，不进入数据库与服务端日志；（2）历史聊天与音乐文件均不离开本机；（3）服务端只在子进程持续时间内持有 Key，结束后即被回收。这一设计虽不能完全消除信任前提，但相对于「全端云推理」已显著降低了用户的隐私负担，并与\cref{chap:requirement} 中归纳的「本地优先」原则一致。
